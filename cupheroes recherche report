@@ -1,0 +1,478 @@
+# Spezifikation für ein faires webbasiertes Cup-Heroes-Remake
+
+## Executive Summary
+
+*Cup Heroes* ist öffentlich als farbenfrohes Fantasy-RPG mit Roguelike-Elementen positioniert, hat auf Google Play mehr als 10 Millionen Downloads, auf iOS rund 84.000 Bewertungen, und ist inzwischen sogar als Browserfassung über CrazyGames mit HTML5 auf Unity-WebGL-Basis spielbar. Offizielle Storetexte nennen Helden wie Knight Cup und Ninja Cup, täglichen Fortschritt, Events und eine Reise durch Wälder, Vulkane und Dungeons; die belastbarste Beschreibung des eigentlichen Kernloops liefert aber Apples Editorial-Seite: Gegner lassen weiße Kugeln fallen, diese werden zwischen Kämpfen über Multiplikator-Gates ausgespielt und anschließend in Run-Upgrades investiert. citeturn17view0turn39view0turn26view1turn16view0
+
+Die öffentlich dokumentierte Produktlage ist widersprüchlich. Google Play und Xbox-Achievements markieren das Spiel als Singleplayer/Offline, während die App-Store-Versionhistorie 2026 zusätzlich Ranked, Pantheon-ähnliche Systeme, Guild Hall, Guild Market, Weekly Quests und Leaderboards zeigt. Gleichzeitig verweisen die Stores offen auf Werbung, In-App-Käufe, zufällige Items bzw. Loot Boxes, Messaging/Chat und mehrere Pass- oder Speed-Produkte. Community-Guides und Store-Reviews deuten zudem auf starke Spätspiel-Power-Spikes, dominante Prozentwert-/Execute-Metas und zunehmenden Monetarisierungsdruck hin. Für ein Web-Remake ist das die wichtigste Lehre: Die eigentliche Spielidee trägt, die Live-Economy im Ist-Zustand offenbar deutlich schlechter. citeturn33view3turn13view0turn33view1turn31view0turn34view3turn29view0turn28view0
+
+Die Empfehlung für die Neuumsetzung ist deshalb eindeutig: **Singleplayer-first, mobile-web-first, PWA-first, fair-economy-first**. Das Remake sollte den charakteristischen Loop aus Wellenkampf, Kugel-Board und Upgrade-Draft übernehmen, aber jede Form von Pay2Win, Loot Boxes, Speed- oder Power-Sales, erzwungenen Interstitial-Anzeigen und sozialem Dark-Pattern-Design entfernen. Wenn später Ranked oder Guild-Features kommen, dann nur mit normalisierten Werten, klarer Moderation, serverautoritativem Wettbewerb und standardmäßig restriktiven Kommunikationsrechten. Anders gesagt: Die Wallet darf kein Balance-Patch ersetzen. citeturn37view1turn36view2turn37view0
+
+## Quellenlage und Annahmen
+
+Die Rekonstruktion stützt sich auf offizielle Primärquellen, die öffentlich verfügbar sind: Google Play, App Store, Apple-Editorial, CrazyGames, App-Store-Versionhistorie sowie Web-Standards-Dokumentation von W3C, MDN, Apple und Material Design. Daneben waren nur wenige sekundäre Mechanikquellen auffindbar; die öffentliche Fandom-Wiki umfasst derzeit lediglich zwei Seiten. Das ist wichtig, weil dadurch zahlreiche Detailwerte des Originals **nicht** kanonisch sichtbar sind. citeturn17view0turn16view0turn26view1turn28view0
+
+Öffentlich belastbar sind vor allem folgende Punkte: Das Spiel verwendet einen Ball-/Multiplikator-Zwischenloop, eine Wellenstruktur von 14 Normalwellen plus Bosswelle, ein Gear-System mit Merge-Progression, mehrere Gear-Familien mit den Namen Collector, Defender, Rogue, Tactician und Warrior sowie heroenspezifische Mechanikmotive wie Cowboy-Magazine, Barbarian-Rage/Reflect, Eiva-Wisps, Felorc-Flammen, Rexx-Bären und Druid-Ents. Ebenfalls klar belegt sind Ads, In-App-Purchases, Loot Boxes/Random Items, Season-/Cup-Pass-Produkte und spätere Live-Features wie Ranked und Guilds. citeturn16view0turn28view0turn13view0turn31view0turn33view1
+
+Die folgende Spezifikation trennt daher sauber zwischen **beobachteten Originalmerkmalen** und **implementierungsreifen Vorschlägen**. Wo exakte Originaldaten fehlen, sind die nachfolgenden Gegner-, Item- und Zahlenwerte als **Vorschlagsbasis für die Web-Neuimplementierung** zu lesen, nicht als behauptete Originaldaten. Das gilt besonders für Gegnerlisten, HP-/Schadenswerte, Resistenzmatrizen und die kompletten Blessing-Pools. Diese Daten sind öffentlich nicht vollständig dokumentiert. citeturn28view0turn29view0
+
+Ein zusätzlicher, ganz nüchterner Risikopunkt: Im App Store ist ein Copyright-Hinweis auf „© 2024, 501 Ltd.“ hinterlegt. Eine Veröffentlichung als echtes *Cup Heroes*-Remake verlangt daher IP-/Lizenzklärung; ohne Rechte sollte dasselbe System als klar differenzierter Spiritual Successor umgesetzt werden. citeturn31view0
+
+### Rekonstruktionsbasis für die Web-Spezifikation
+
+| Bereich | Öffentlich beobachtbar | Entscheidung für die Spezifikation |
+|---|---|---|
+| Kernloop | Wellenkampf → Kugeln sammeln → Multiplikator-Board → Upgrade-Draft | beibehalten |
+| Run-Struktur | 14 Wellen + Bosswelle 15 | standardisieren |
+| Gear | 6 Slots, Set-Familien, Merge-Progression | beibehalten, aber deterministischer craftbar machen |
+| Heroes | einzelne Archetypen und Mechaniken bekannt, komplette Roster-Daten unvollständig | 8-Heroen-Launch-Roster definieren |
+| Gegner | Thematische Feinde und Bosse bekannt, keine vollständige kanonische Stat-Liste | komplette neue Launch-Gegnerbibliothek definieren |
+| Modi | Singleplayer/offline einerseits, Ranked/Guilds später andererseits | Singleplayer-first, soziale Modi optional |
+| Monetarisierung | Ads, Passes, Random Items/Loot Boxes, Speed-Produkte | nur Kosmetik, keine Machtkäufe |
+
+Diese Ableitung basiert auf den offiziellen Storeeinträgen, Apples Editorial-Seite, App-Store-Versionhistorie, Achievements und den wenigen sekundären Mechanikquellen. citeturn17view0turn16view0turn26view1turn13view0turn31view0turn33view1turn28view0turn29view0
+
+## Design-Spezifikation
+
+### Produktprinzipien
+
+Das Web-Remake sollte fünf harte Produktprinzipien verfolgen. Erstens: **Skill und Entscheidungen schlagen Bezahlvorteile**. Zweitens: **Runs sind kurz, wiederholbar und lesbar**. Drittens: **die Kugel-Ökonomie ist das Signature-System und muss fair, deterministisch nachvollziehbar und performant sein**. Viertens: **Meta-Fortschritt unterstützt Builds, darf aber kein numerischer Zwangskäfig werden**. Fünftens: **Mobile Web ist kein abgespeckter Client, sondern die Zielplattform**. Diese Ausrichtung leitet sich direkt aus dem beobachtbaren Originalkern und den dokumentierten Schwächen des bestehenden Live-Betriebs ab. citeturn16view0turn28view0turn34view3turn31view0
+
+### Kernloop, Steuerung und Physik
+
+Das beobachtbare Grundmuster ist konsistent genug, um es unverändert zu übernehmen: Ein Held kämpft wellenweise gegen Gegnergruppen, getötete Gegner füllen einen Kugelbecher, nach der Welle wird dieser Becher in ein Multiplikator-Board entleert, und die gewonnene Run-Währung finanziert Upgrade-Entscheidungen für die nächste Welle. Community- und Review-Quellen beschreiben die Kämpfe als runden- oder zugbasiert; Marketingtexte sprechen nur vage von „swipe, tap and drag“. Für die Implementierung sollte daher eine **rundeweise Auto-Battle-Struktur mit klaren Turn-Phasen** gewählt werden, weil sie öffentlich am konsistentesten belegbar ist. citeturn16view0turn28view0turn39view1turn17view0
+
+Die Bedienung muss **einhandfähig** sein. Kampffokus: Tap für Bestätigung, Tap-and-Hold für Tooltip, optional eine einzelne aktive Fähigkeit pro Welle; keine permanenten virtuellen Sticks. Das Kugel-Board darf per Drag ausgerichtet werden, **muss** aber zusätzlich eine Tap-Alternative erhalten, weil WCAG 2.5.7 fordert, dass Dragging-Funktionen auch mit einem einzelnen Pointer ohne Ziehbewegung bedienbar sind. Die Input-Schicht soll auf Pointer Events basieren, weil diese Touch, Maus und Pen in einem einheitlichen Modell zusammenführen. citeturn24search3turn20search1
+
+Für das Board selbst ist „echte“ Physik nur dort sinnvoll, wo sie visuell relevant ist. Die Ökonomie sollte nicht auf hunderten echten Floating-Point-Kollisionen pro Welle hängen. Empfehlung: **hybrides Board**. Sichtbar fallen Partikel oder Kugel-Sprites physikalisch plausibel; ökonomisch wird der Ausgang über einen seed-basierten, diskreten Verteilungsalgorithmus bestimmt. Damit bleiben Runs reproduzierbar, Betrugserkennung einfacher und die Performance auf mobilen Browsern stabil. Das Designziel ist ein neutrales erwartetes Auszahlungsmittel von **1,15×** pro neutralem Board, mit einem Mindestpayout von **0,5×** und einem Hartcap pro Welle, um Exploit-Kaskaden zu verhindern. Diese Strenge ist nötig, weil Community-Metas des Originals stark auf Kugel- und Execute-Schneebälle hindeuten. citeturn29view0turn28view0
+
+### Spielfluss
+
+```mermaid
+flowchart TD
+    A[App Start] --> B[Home]
+    B --> C{Modus}
+    C -->|Kapitel| D[Hero und Loadout]
+    C -->|Ranked optional| E[Queue und Seed]
+    D --> F[Run Start]
+    E --> F
+    F --> G[Wave Kampf]
+    G --> H{Wave geschafft}
+    H -->|Nein| I[Niederlage]
+    H -->|Ja| J[Kugeln im Becher]
+    J --> K[Multiplikator-Board]
+    K --> L[Upgrade-Draft]
+    L --> M{Bosswave erreicht}
+    M -->|Nein| G
+    M -->|Ja| N[Bosskampf]
+    N --> O{Boss besiegt}
+    O -->|Nein| I
+    O -->|Ja| P[Sieg und Beute]
+    I --> Q[Meta-Fortschritt]
+    P --> Q
+    Q --> B
+```
+
+Der Durchlauf muss ohne Medienbruch funktionieren. Wichtig ist, dass **jeder Wellenabschluss belohnt**, selbst wenn der ganze Run scheitert. Das ist im Original öffentlich beschrieben und sollte beibehalten werden, weil es Frust senkt und Wiederholungsschleifen legitim macht. Für das Web-Remake empfehle ich eine abgestufte Reward-Kurve: 35 % Basisreward nach Wave 1+, 55 % nach Wave 5+, 70 % nach Wave 10+, 85 % bei Bossniederlage. citeturn28view0turn39view1
+
+### Spielphasen
+
+| Phase | Zweck | Kern-Interaktion | Serverbedarf | Muss-Zustand |
+|---|---|---|---|---|
+| Boot und Restore | Konfiguration, Consent, Save laden | keine bis minimal | Konfig optional, Save-Sync optional | unter 2 Sekunden bis Home auf Warm Cache |
+| Home | zentraler Einstieg | Start, Kapitel, Heroes, Crafting, Shop, Einstellungen | Profil laden | nächster sinnvoller CTA klar sichtbar |
+| Hero und Loadout | Hero, Gear, Trinket wählen | Tap, Compare, Equip | Inventar und Hero-Daten | kein Hidden-Stat-Design |
+| Kapitelwahl | Story-Fortschritt, Mastery, Drops | Tap auf Kapitelkarte | Kapitelstatus | empfohlene Kapitel klar markiert |
+| Queue optional | Ranked/Challenge | Join, Confirm, Cancel | Match-/Seed-Service | nur nach Launch-MVP |
+| Run Start | Seed, Gegnerbudget, Boardmods | Confirm | Start-Run | deterministische Run-ID |
+| Wave-Kampf | zentrale Gameplay-Phase | Auto-Battle, 1 Active, Pause | lokal; ranked serverautoritativ | 60 FPS Ziel |
+| Multiplikator-Board | Run-Währung erzeugen | Drag oder Tap-Alternative | lokal | klare Prognose, kein Tarn-RNG |
+| Upgrade-Draft | Run-Entscheidung | 1 aus 3 wählen, rerollen | lokal | verständliche Tooltips, Kosten sichtbar |
+| Boss | Prüfpunkt | wie Wave-Kampf | lokal/server je Modus | Boss-Telegraphing zwingend |
+| Sieg/Niederlage | Rewards, Fortschritt, Retention | Continue, Retry, Kapitel erneut | Reward-Commit | nie mehr als 2 Bestätigungen |
+| Crafting/Shop | Meta-Fortschritt | Merge, Craft, Buy | Economy-Server | kein Power-Sale mit Echtgeld |
+| Einstellungen | Audio, Video, A11y | Toggles, Sliders | optional | immer erreichbar |
+
+### Spielerwerte, Helden und Progression
+
+Die universellen Stats sollten bewusst begrenzt werden, damit das Spiel nicht in eine reine Zahleninflation kippt. Hauptwerte: **ATK, MaxHP, Armor, CritChance, CritDamage, Bounce, ExtraAttack, Lifesteal, Dodge, Execute, Thorns, SummonPower, BallGain, Rerolls**. Harte Balance-Caps sind nötig: effektive Schadensreduktion maximal **75 %**, Dodge maximal **35 %**, Lifesteal maximal **20 %**, Execute gegen Bosse **nie tödlich**, sondern in Bonus-True-Damage umgewandelt. Diese Caps sind eine direkte Reaktion auf öffentlich dokumentierte Meta-Muster des Originals, in denen Execute-, Reflect- und Prozent-HP-Builds dominant erscheinen. citeturn29view0turn28view0turn33view1
+
+Systemisch empfehle ich **drei Progressionsschichten**. Erstens: **Account-Fortschritt** mit kleinen globalen Boni, insgesamt auf etwa **+25 %** Machtzuwachs über die gesamte Lebenszeit gedeckelt. Zweitens: **Hero-Level** mit signifikanten Breakpoints auf Level 3, 5, 8, 11 und 15; die Wahl dieser Markierungen lehnt sich an die öffentlich genannten Power-Spikes einzelner Originalhelden an. Drittens: **Run-Fortschritt** über den Upgrade-Draft. Genau diese Trennung macht Balancing wartbar. Wenn alles überall skaliert, endet der Spätspielzustand dort, wo das Original laut Reviews bereits Probleme zeigt. citeturn29view0turn28view0turn34view3
+
+#### Universelle Stat-Definitionen
+
+| Stat | Wirkung | Standard-Cap | Bemerkung |
+|---|---|---|---|
+| ATK | Basis aller direkten Schadensquellen | keiner | Hauptskalierung |
+| MaxHP | Gesundheitsvorrat | keiner | Hauptüberlebenswert |
+| Armor | reduziert direkten Schaden | 75 % effektive DR | Formel: Schaden × 100 / (100 + Armor) |
+| CritChance | Chance auf kritischen Treffer | 60 % soft cap | darüber abnehmende Zugewinne |
+| CritDamage | Multiplikator auf Crits | +150 % soft cap | additive Mods |
+| Bounce | zusätzliche Trefferabpraller | 6 | Kernsynergie mit Rogue/Eiva/Cowboy |
+| ExtraAttack | Zusatzangriff pro Runde | 60 % | bosssensitiv |
+| Lifesteal | Heilung aus Schaden | 20 % | kein Heal aus Reflektionsschaden |
+| Dodge | Treffervermeidung | 35 % | Boss-Angriffe ignorieren 50 % Dodge |
+| Execute | Soforttötung auf Non-Boss | 9 % | Boss-Conversion statt Kill |
+| Thorns | Rückschaden | 50 % | vor Armor-Berechnung des Gegners, aber gecappt |
+| SummonPower | Schaden/Leben von Beschwörungen | keiner | separates Skalierungsfeld |
+| BallGain | Run-Währung pro Kill | 300 % | nur im PvE |
+| Rerolls | neue Draft-Auswahl | 5 gespeichert | kein Echtgeld-Kauf |
+
+#### Launch-Roster der Helden
+
+Die folgende Liste ist eine **Vorschlagsbasis für die Web-Version**, inspiriert von öffentlich belegten Hero-Motiven. Bei fehlender Lizenz sollten Namen und Illustrationen verändert, die Mechanik-Archetypen aber beibehalten werden.
+
+| Held | Rolle | Basis-HP | Basis-ATK | Signaturmechanik | Talentfokus |
+|---|---:|---:|---|---|
+| Woodie | Starter-Ranger | 110 | 18 | jeder dritte Zug feuert Split Shot | Bounce, Crit, Einstieg |
+| Cowboy | Burst/Execute | 95 | 22 | Magazin-System, Deadeye auf geladene Schüsse | Magazin, Execute, Rerolls |
+| Barbarian | Tank/Reflect | 145 | 15 | Rage pro Treffer, kontrolliertes Reflektieren | Thorns, Sustain, Rage |
+| Eiva | Swarm-Mage | 100 | 17 | Wisps verursachen End-of-Turn-Hits | Wisps, Freeze, Multihit |
+| Felorc | DoT/Boss-Killer | 108 | 16 | Burn und gecappter Hellfire-Effekt | Burn, Survival, Curse |
+| Rexx | Beastmaster | 130 | 17 | Bären-Kompanion und Pack-Synergien | Beasts, Guard, Pack |
+| Druid | Summon/Control | 115 | 15 | Ents, Roots und Natur-Shields | Ents, Shields, Utility |
+| Mammon | Drain-Bruiser | 120 | 16 | Life Drain, self-heal, risk-reward scaling | Drain, Greed, Debuffs |
+
+## Content-Spezifikation
+
+Die folgenden Tabellen sind **keine kanonische Extraktion des Originals**, sondern eine vollständige, implementierungsreife **Launch-Bibliothek für das Web-Remake**. Das ist nötig, weil es öffentlich keine vollständige Original-Gegnerliste mit Stats gibt. Die Namen der Gear-Familien und einige Hero-Motive lehnen sich an öffentlich belegte Begriffe an; die Gegner-, Boss- und Blessing-Werte sind dagegen bewusst neu gesetzt und balanciert. citeturn28view0turn13view0
+
+### Gegnerkatalog und Skalierung
+
+Die Basiswerte in der Tabelle gelten für **Kapitel 1, Wave 1**. Skalierungsvorschlag:
+
+- **HP** = `BaseHP × 1.11^(Kapitel-1) × (1 + 0.07 × (Wave-1))`
+- **DMG** = `BaseDMG × 1.09^(Kapitel-1) × (1 + 0.05 × (Wave-1))`
+- **Elite** = HP × 2.2, DMG × 1.5
+- **Boss** = HP × 10, DMG × 2.0
+- **Resistenz-Cap** = 60 % normal, 75 % Boss
+
+Diese Kurve ist absichtlich flacher als die von Spielerreviews geschilderten Original-Power-Spikes. Sie soll Build-Entscheidungen erzwingen, ohne linearen Stat-Betrug oder Bezahlabkürzungen zu verlangen. citeturn34view3turn29view0turn28view0
+
+#### Normale und Elite-Gegner
+
+| Gegner | Tier | Base HP | Base DMG | Resistenzen | Verhalten | Spawnmuster |
+|---|---|---:|---:|---|---|---|
+| Cup-Gremlin | Normal | 45 | 10 | keine | schneller Nahkämpfer, greift zuerst an | frühe Schwärme |
+| Shambling Zombie | Normal | 80 | 9 | Gift 50 % | langsamer Tank | Frontlinie in allen Welten |
+| Skeleton Archer | Normal | 55 | 12 | keine | Backline-Fernkämpfer | hinter Tanks, 2–4 pro Welle |
+| Slime Splitter | Normal | 70 | 8 | Physisch 20 % | zerfällt beim Tod in 2 Mini-Slimes | Midgame-Mix |
+| Bomb Imp | Normal | 40 | 18 | Feuer 50 % | explodiert nach 2 Runden oder beim Tod | Glass-Cannon-Wellen |
+| Shield Beetle | Normal | 95 | 10 | Front Armor 40 % | blockt die ersten 2 Treffer | mit Archern/Shamans |
+| Bat Swarm | Normal | 50 | 11 | Dodge 20 % | zwei kleine Treffer pro Runde | Anti-Slow-Setup |
+| Cult Adept | Normal | 60 | 8 | Schatten 25 % | schwächt Helden-ATK um 10 % | Support-Mobs |
+| Wolf Rider | Normal | 75 | 14 | keine | Charge auf Held mit niedrigstem HP-Prozent | Ambush-Wellen |
+| Frost Shaman | Elite | 85 | 11 | Frost 50 % | 25 % Freeze-Chance, unterstützt Backline | Snow/Fortress |
+| Grave Knight | Elite | 180 | 22 | Physisch 25 %, Schatten 50 % | Cleave-Angriff, priorisiert Frontschläge | Wellen 10–14 |
+| Crystal Medic | Elite | 140 | 10 | Arcane 25 % | heilt alle 2 Runden den schwächsten Verbündeten | Wellen 8–14 |
+| Inferno Brute | Elite | 165 | 24 | Feuer 75 % | Burn-Cleave alle 3 Runden | Volcano/Dungeon |
+
+#### Bosse
+
+| Boss | Base HP | Base DMG | Resistenzen | Boss-Mechanik | Welt |
+|---|---:|---:|---|---|---|
+| Bandit King | 820 | 25 | keine | beschwört Gremlins bei 70 % und 40 % HP | Waldpfad |
+| Bone Tyrant | 850 | 28 | Physisch 25 %, Schatten 50 % | beschwört Skelette, cleavet Front | Katakomben |
+| Inferno Wyrm | 900 | 30 | Feuer 75 % | Brandlinie alle 3 Züge | Feuergrat |
+| Frost Matron | 880 | 26 | Frost 75 % | globaler Slow/Freeze-Impuls | Frostpass |
+| Void Regent | 950 | 32 | Schatten 75 % | erzeugt Spiegelbilder bei 50 % HP | Schwarze Zitadelle |
+
+### Ausrüstung, Blessings und Synergien
+
+Achievments und Guides belegen, dass Setnamen wie Collector, Defender, Rogue, Tactician und Warrior das Original prägen und dass besonders Rogue Ring, Collector Helm und Tactician-Synergien stark meta-bestimmend wurden. Genau deshalb sollte die Web-Neufassung diese Sets **erkennbar**, aber **weniger degenerativ** bauen: Execute nur eingeschränkt, Economiesynergien im Ranked deaktivierbar, Prozentwert-Builds sauber gecappt. citeturn13view0turn29view0turn33view1
+
+#### Permanente Gear-Sets
+
+Slots: **Waffe, Ring, Handschuhe, Helm, Brust, Stiefel**. Raritäten: **Gewöhnlich, Selten, Episch, Legendär, Mythic**. Skalierung pro Raritätsstufe: **1.0 / 1.25 / 1.6 / 2.0 / 2.4** auf den Basiseffekt. Merge-Regel: **3 gleiche Items gleicher Familie und gleicher Rarität → 1 Item der nächsten Rarität**. Zusätzlich sollte Crafting über Blueprints möglich sein, um reines Fusions-Grinding zu entschärfen.
+
+| Set | Waffe | Ring | Handschuhe | Helm | Brust | Stiefel | Setboni |
+|---|---|---|---|---|---|---|---|
+| Tactician | jeder 3. Angriff +1 Bounce | +1 Reroll pro Draft | Start mit +6 Balls | zeigt 1 extra Draft-Option vor Wahl | +10 % Board-Payout | +0,5x auf 1 Random-Lane | 2er: +1 Reroll; 4er: +1 Draft-Option und +15 % BallYield; 6er: erstes Board eines Runs kann nicht unter Input auszahlen |
+| Collector | +12 % Gold | +10 % Blueprint-Drops | +1 Boss-Reward-Reroll | Start mit 1 freiem Preview-Pick | +12 % Hero-XP | Retry refundet 20 % Eintrittskosten | 2er: +15 % Rewards; 4er: 1 freier Draft auf Wave 1; 6er: +1 Boss-Chest-Choice; **im Ranked deaktiviert** |
+| Rogue | +8 % Crit | +3 % Execute auf Non-Boss, Boss-Conversion | +6 % Dodge | markiert niedrigste HP-Ziele | +10 % Schaden auf markierte Ziele | 1 Shadow-Step-Proc alle 5 Züge | 2er: +10 % Crit; 4er: erster Crit pro Runde ricochets; 6er: Execute würfelt nur auf Primärtreffer |
+| Defender | +12 Armor | reflektiert 10 % Schaden | +8 Block-Wert | +10 % MaxHP | +15 % Shield-Gain | -5 % eingehender Schaden | 2er: +15 Armor; 4er: +10 % Reflect; 6er: erster Treffer pro Wave halbiert |
+| Warrior | +10 % ATK | +5 % Lifesteal | +10 Fury on hit | Kills heilen 5 % HP | +10 % Schaden unter 50 % HP | +8 % ExtraAttack-Chance | 2er: +8 % ATK; 4er: +8 % Lifesteal; 6er: Berserk unter 35 % HP |
+
+#### Komplette Launch-Liste der globalen Blessings und Active Trinkets
+
+Blessings sind **run-lokale** Items. Standard-Draft nach jeder Welle: **3 Angebote**, Gewichtung **60 % heroenspezifisch / 40 % global**, sofern der Hero Unique-Pool Einträge hat. Kostenbasis je Rarität: **40 / 90 / 180 / 320 / 500 Balls**.
+
+| Name | Typ | Rarität | Effekt | Stacking | Hauptsynergien |
+|---|---|---|---|---|---|
+| Startkapital | Passiv | Gewöhnlich | Run startet mit +6 Balls | linear, max 3 | Tactician, Economy |
+| Beutezug | Passiv | Gewöhnlich | jeder Kill gibt +1 Ball extra | linear, max 5 | Summons, Swarms |
+| Verstärkerfächer | Passiv | Selten | 3 zufällige Board-Lanes erhalten +0,5x | linear, pro Lane max +2,0x | Board-Fokus |
+| Abpraller | Passiv | Gewöhnlich | Bounce +1 | linear, max 4 | Woodie, Eiva, Cowboy |
+| Salve | Passiv | Selten | ExtraAttack +20 % | additive, cap 60 % | Cowboy, Warrior |
+| Schwachstellenanalyse | Passiv | Selten | erster Treffer pro Gegner macht Vulnerable +15 % für 2 Runden | refreshbar | Elite/Boss-Fokus |
+| Stahlhaut | Passiv | Episch | +30 Armor und -10 % eingehender Schaden | additiv bis DR-Cap | Barbarian, Defender |
+| Lebensraub | Passiv | Episch | +8 % Lifesteal | linear, cap 20 % | Warrior, Mammon |
+| Scharfrichter | Passiv | Legendär | +3 % Execute auf Non-Boss; gegen Bosse 1× pro Runde +2 % Boss-MaxHP als True Damage | linear, max 9 % | Rogue, Cowboy |
+| Vitalstrom | Passiv | Gewöhnlich | +25 % MaxHP | linear, max 4 | alle |
+| Nebelschritt | Passiv | Selten | +8 % Dodge | additiv, cap 35 % | Rogue, Eiva |
+| Preisnachlass | Passiv | Gewöhnlich | nächster Draft kostet -20 % Balls | speicherbar 1× | Economy |
+| Heilkrug | Aktiv | Gewöhnlich | heilt 25 % MaxHP | 2 Charges pro Run | Sustain |
+| Schutzbanner | Aktiv | Selten | gibt Shield in Höhe von 35 % MaxHP für 2 Runden | 1× pro Wave | Defender, Druid |
+| Frostglocke | Aktiv | Episch | friert normale Gegner 1 Runde ein; Bosse: Aktionstempo -50 % | 1× alle 3 Wellen | Eiva, Druid |
+| Brandbombe | Aktiv | Episch | alle Gegner erhalten Burn über 3 Runden im Wert von 20 % ATK | 1× alle 3 Wellen | Felorc |
+| Zeitanker | Aktiv | Legendär | überspringt die nächste gegnerische Aktionsphase | 1× pro Boss, 1× pro Run sonst | Boss-Skillcheck |
+
+### Kapitel- und Wellenstruktur
+
+Öffentlich ist die 15-Wellen-Struktur gut belegt; für die Web-Version sollte sie als Grundtakt unverändert bleiben. Empfohlen sind **5 Welten mit je 6 Kapiteln** für Launch = **30 Kapitel**, später erweiterbar. Jedes Kapitel hat ein eigenes Seed-Set, Drop-Tabellen und Weltmodifikatoren. So entsteht Tiefgang, ohne sofort in hunderte kaum unterscheidbare Stages abzugleiten. citeturn28view0turn26view1
+
+#### Weltstruktur
+
+| Welt | Thema | Umweltregel | Hauptgegner | Boss |
+|---|---|---|---|---|
+| Waldpfad | freundlicher Einstieg | +10 % BallDrop auf Normalmobs | Gremlins, Beetles, Rider | Bandit King |
+| Feuergrat | Burn-Welt | jeder 4. Kampf hat Feuerhazard | Bomb Imps, Inferno Brutes | Inferno Wyrm |
+| Katakomben | Undead-Welt | Heilung -20 % für beide Seiten | Zombies, Skeletons, Grave Knight | Bone Tyrant |
+| Frostpass | Kontroll-Welt | alle Einheiten erhalten +10 % Slow-Empfindlichkeit | Frost Shaman, Bats | Frost Matron |
+| Schwarze Zitadelle | Elite-Welt | Elites erhalten +1 Sondermodifikator | Cult, Medic, Void-Adds | Void Regent |
+
+#### Wellenbudget und Ökonomie
+
+| Wellenblock | Zielgefühl | Spawnbudget | Gegnerkomposition | Zielertrag Balls |
+|---|---|---:|---|---:|
+| Wave 1–4 | Aufbau | 6–10 | nur normale Gegner | 80–140 |
+| Wave 5–9 | Verdichtung | 11–17 | Normals, selten 1 Elite | 110–190 |
+| Wave 10–14 | Druck | 18–25 | 1–2 Elites, Anti-Synergie-Gruppen | 150–260 |
+| Wave 15 | Prüfung | Boss-only | 1 Boss, eventuell Phasenadds | 220+ Bossbonus |
+
+### Wellenprogression
+
+```mermaid
+flowchart LR
+    A[Kapitel Start] --> B[Wave 1 bis 4 Aufbau]
+    B --> C[Wave 5 bis 9 Verdichtung]
+    C --> D[Wave 10 bis 14 Druck]
+    D --> E[Wave 15 Boss]
+    E --> F[Kapitelbelohnung und Mastery]
+    F --> G{Nächstes Kapitel}
+    G -->|Ja| A
+    G -->|Nein| H[Neue Welt oder Challenge]
+```
+
+### Schwierigkeitsskalierung
+
+Die wichtigste Balance-Regel lautet: **Spieler sollen an build-spezifischen Checks scheitern, nicht an reiner Statistikmauer**. Deshalb sollten Kapitel Gegnerkombinationen stärker variieren als reines HP-Blowing. Empfehlungen:
+
+- alle 3 Kapitel ein neuer taktischer Gegnertyp,
+- alle 6 Kapitel ein neuer Boss,
+- nach Kapitel 30 keine lineare Story-Inflation, sondern **Ascension-Modifikatoren**,
+- Bossresistenzen gegen Execute, %HP-True-Damage und Reflect, damit kein einzelner Exploit das gesamte Endgame frisst,
+- Economy-Blessings nur im PvE, nicht im Ranked.
+
+## UX, Fairness und Betrieb
+
+### Mobile-Web UI/UX und audiovisuelle Leitlinien
+
+Die Oberfläche muss auf Touch zuerst optimiert werden. W3C fordert mindestens 24 × 24 CSS-Pixel Zielgröße, Apple empfiehlt 44 × 44 pt und Material 48 dp. Praktisch sollte das Remake für alle kritischen Bedienelemente im Kampf, Draft und Shop **48 px+** ansetzen. Dazu kommen klare Focus-States, weil WCAG 2.4.13 und verwandte Kriterien Fokus deutlich sichtbar halten wollen. Kleine, eng gedrängte Buttons sind auf Mobile kein „minimalistisches Design“, sondern schlicht eine Einladung zu Fehlbedienungen. citeturn20search3turn24search8turn24search23turn24search2
+
+Die Eingabestruktur sollte streng hierarchisch sein: unten primäre Actions, oben Statusleisten, Mitte Spielfeld. Jede Funktion mit Drag-Komponente braucht eine alternative Ein-Pointer-Bedienung; das betrifft vor allem das Board. Außerdem sollte die App **Portrait-first**, aber **Landscape-safe** sein, da `ScreenOrientation.lock()` nicht auf allen wichtigen Browsern robust verfügbar ist. Deshalb besser reflow-fähige Layouts statt harter Orientierungssperren. citeturn24search3turn21search22turn21search10
+
+Visuell sollte die Web-Version die öffentlich belegte Richtung beibehalten: **farbig, leicht lesbar, fantasievoll, sprite-/pixelnah, aber mit sauberer UI und deutlicher Fähigkeitslesbarkeit**. Offizielle Texte und Apples Editorial beschreiben das Spiel als pixel-artig und farbenstark; genau das sollte man nutzen, jedoch mit besserer Informationsarchitektur, denn selbst positive Originalreviews kritisieren unklare Stat- und Effektbeschreibungen. citeturn16view0turn17view0turn39view1
+
+Akustisch reicht ein kompakter, klar geschichteter Mix: kurze Treffer-SFX, eindeutig unterscheidbare Status-Sounds, ein Boss-Layer mehr, ruhige Menümusik und eine separate Lautstärke pro Kanal. Technisch ist die Web Audio API die richtige Basis; Haptik sollte nur optional per Feature Detection zugeschaltet werden, weil die Vibration API nicht baseline-weit verfügbar ist. citeturn20search6turn20search10turn25search0
+
+### Save, Modi, Monetarisierung und Anti-Griefing
+
+Die Save-Strategie sollte **offline-first** sein. Einzelspieler-Runs, Settings und zuletzt verwendete Loadouts liegen lokal in IndexedDB; ein Service Worker cached Shell, Core-Assets und Offline-Fallback. Bei Online-Verbindung synchronisiert die App Profil, Inventar und Käufe in die Cloud. Das passt deutlich besser zu einem Singleplayer-first-Roguelike als eine rein serverpflichtige Architektur. citeturn21search8turn21search17turn20search8turn21search5
+
+Zum Modusumfang: Öffentliche Daten sind widersprüchlich genug, dass der sichere Weg ein **Singleplayer-first-Kern** ist. Google Play markiert das Produkt als Singleplayer und Offline, Achievements führen es als Offline/Single Player; gleichzeitig zeigen App-Store-Patchnotes Ranked, Guild Hall, Guild Market, Leaderboards und Messaging/Chat. Daraus folgt für die Web-Version: **MVP nur Kapitelmodus, Daily Seed und Async-Challenges**. Erst nach Stabilisierung kommen asynchrones Ranked oder Guild-Boss-Module hinzu. citeturn33view3turn13view0turn33view1turn31view0
+
+Monetarisierung muss strikt anti-manipulativ sein. BIK erläutert sehr klar, warum In-Game-Currency, FOMO, Battle-Pass-Skips, Pay-to-Win und Dark Patterns problematisch sind; FTC-Verfahren gegen Epic zeigen zusätzlich, wie teuer ungewollte Käufe, verwirrende Kauf-Flows und standardmäßig geöffnete Kommunikationsräume werden können. Für das Remake heißt das: **keine Loot Boxes, keine Power-Bundles, keine Speed-Boosts, keine Auto-Blessings, keine bezahlten Revives, keine Interstitials im Run**. Wenn monetarisiert wird, dann über direkte Kosmetik, thematische Skins, UI-Sets, Board-Skins, Audio-Packs und einen **kosmetik-only** Battle Pass ohne Gameplay-Skips. Alle Preise müssen in Klarschrift, mit Echtgeldäquivalent und ohne falsche Rabattricks angezeigt werden. citeturn37view1turn36view2turn37view0turn31view0
+
+Die ursprünglichen Storeeinträge zeigen zudem einen monetären Drift: Ein positiver App-Store-Review aus 2024 beschreibt das Spiel noch ausdrücklich als nicht „pay to play“, spätere Google-Play-Reviews aus 2026 kritisieren dagegen massive Grind-Wände, überteuerte Bundles und echte Fortschrittsblockaden. Diese Divergenz spricht für eine Live-Economy, die sich vom fairen Kern entfernt hat. Das Remake sollte daraus die einzig vernünftige Konsequenz ziehen: **Wirtschaftsregeln schriftlich fixieren und nicht opportunistisch verbiegen**. citeturn39view1turn34view3
+
+#### Monetarisierungsrahmen
+
+| Format | Zulässig | Regel |
+|---|---|---|
+| Hero-Skins | Ja | rein kosmetisch |
+| Cup-/Board-Skins | Ja | rein kosmetisch |
+| VFX-/SFX-Packs | Ja | rein kosmetisch, abschaltbar |
+| Kosmetik-Battle-Pass | Ja | keine Stats, keine Progress-Skips mit Machtwirkung |
+| Direkte Kosmetik-Bundles | Ja | fester Inhalt, kein Random |
+| Interstitial-Ads | Nein | niemals im Run, niemals nach Bossen |
+| Rewarded Ads | Nur optional | höchstens out-of-run und nie für Machtvorteile |
+| Loot Boxes | Nein | vollständig ausschließen |
+| Power-Bundles | Nein | vollständig ausschließen |
+| Speed-Boosts / Auto-Blessings | Nein | vollständig ausschließen |
+| Paywall für Kapitel-Fortschritt | Nein | vollständig ausschließen |
+
+#### Anti-Griefing und Social-Sicherheit
+
+Falls soziale Systeme später aktiviert werden, sollten sie **nicht** mit offenem Free-Chat starten. Der FTC-Fall zu Fortnite ist ein deutlicher Reminder, dass standardmäßig offene Voice-/Text-Systeme Kinder und Jugendliche gefährden können; der aktuelle App-Store-Eintrag von *Cup Heroes* weist bereits Messaging/Chat aus. Deshalb: MVP sozial nur mit Emotes und Quick-Pings, später opt-in Textchat, standardmäßig aus, mit Mute/Block/Report, Profanity-Filter, Cooldown-Limits und serverseitigen Moderation-Tools. Für Ranked zusätzlich AFK-Erkennung, Rejoin-Fenster, verifizierte Match-Logs und saisonale Soft-Resets. citeturn36view2turn31view0
+
+### KPIs und Analytics
+
+KPIs sollten nicht nur Wachstum, sondern auch Fairness und Systemgesundheit messen.
+
+| Bereich | KPI | Zielwert |
+|---|---|---|
+| Retention | D1 | ≥ 35 % |
+| Retention | D7 | ≥ 12 % |
+| Retention | D30 | ≥ 4 % |
+| Onboarding | Abschluss Kapitel 1 innerhalb 2 Sessions | ≥ 70 % |
+| Core Loop | Anteil Runs bis Wave 10 nach Session 3 | 45–60 % |
+| Core Loop | Bossclear-Rate Kapitel 1–3 | 35–45 % |
+| Balance | Dominanz eines einzelnen Heroes im PvE | < 22 % Pickrate |
+| Monetarisierung | Kosmetik-Conversion | 1–3 % |
+| Monetarisierung | Refund-Rate | < 0,5 % |
+| Fairness | tatsächliche Machtvorteile durch Echtgeld | 0 |
+| Technik | Crash-free Sessions | ≥ 99,5 % |
+| Technik | p75 INP | ≤ 200 ms |
+| Technik | mittlere FPS im Kampf | > 55 |
+| Sicherheit | Harassment-Reports pro 1.000 DAU | sinkend, < 5 bei Chat-enabled |
+
+Die INP-Zielmarke von 200 ms entspricht der von web.dev empfohlenen Schwelle für gute Responsiveness. citeturn38view2
+
+#### Beispielhafte Analytics-Events
+
+| Event | Trigger | Wichtige Felder |
+|---|---|---|
+| `app_boot` | App wird geladen | appVersion, locale, deviceClass |
+| `session_start` | Session beginnt | installAge, source, consentState |
+| `hero_selected` | Held gewählt | heroId, heroLevel, loadoutPower |
+| `run_start` | Run startet | mode, chapterId, runSeed, heroId |
+| `wave_start` | Welle beginnt | runId, wave, hpPct, activeBlessings |
+| `wave_end` | Welle endet | kills, damageTaken, ballsCollected |
+| `cup_drop_resolved` | Board abgeschlossen | inputBalls, outputBalls, laneResult |
+| `upgrade_shown` | Draft erscheint | optionIds, costs, rerollsLeft |
+| `upgrade_selected` | Draft-Wahl | chosenId, skippedIds, ballSpend |
+| `boss_defeated` | Boss fällt | chapterId, runTime, hpLeft |
+| `run_end` | Sieg/Niederlage | outcome, lastWave, rewardSummary |
+| `gear_merged` | Merge/Crafting | slot, family, fromRarity, toRarity |
+| `cosmetic_purchase` | Kauf | sku, priceLocal, currencyType |
+| `report_player` | Social moderation | reason, mode, targetId |
+| `performance_sample` | Periodisch | fpsAvg, fpsLow1, INP, memEstimate |
+
+## Technische Architektur und Umsetzungsplan
+
+### Empfohlener Stack, Datenmodelle und APIs
+
+Für eine mobile, installierbare Web-App ist eine **PWA** naheliegend. Ein Web App Manifest ist zentral für die Installierbarkeit; Service Worker ermöglichen Offline-First-Verhalten, weil sie Requests abfangen und aus dem Cache beantworten können; IndexedDB ist für große strukturierte Clientdaten deutlich geeigneter als simples Web Storage. Genau diese Kombination sollte das Fundament des Spiels bilden. citeturn20search8turn21search5turn21search8
+
+Als Game-Engine empfehle ich **TypeScript + Phaser 3**. Phaser ist explizit auf Desktop- und Mobile-Webbrowser ausgerichtet, unterstützt WebGL und Canvas, kann mit `Phaser.AUTO` automatisch WebGL bevorzugen und sonst auf Canvas zurückfallen, bietet ein einheitliches Input-System über Geräte hinweg und lässt sich sauber in moderne Frontend-Frameworks integrieren. Für die Produkt-Hülle darüber eignet sich ein separates UI-Layer in React oder Vue; spielkritische Logik bleibt im reinen Game-State. citeturn22search1turn22search21turn22search17turn22search3
+
+Netzwerkseitig genügt für den gesamten Singleplayer- und Commerce-Teil eine klassische HTTP-API per Fetch; für optionale Ranked-Queues oder Live-Guild-Events ist WebSocket sinnvoll, weil das WebSocket-API bidirektionale, interaktive Sessions erlaubt. Die HTTP-Schnittstellen sollten formell per OpenAPI beschrieben werden, damit Clients, Test-Tools und QA dieselbe Wahrheit sehen. Browsererkennung per User-Agent ist zu vermeiden; Feature Detection ist robuster. citeturn23search6turn23search0turn23search11turn25search11
+
+Audio läuft über Web Audio API mit getrennten Bussen für Musik, SFX und UI. Für besonders saubere Mobile-Ausgabe sollte das Team `baseLatency` und `outputLatency` in Performance-Tests beobachten, auch wenn nicht jeder Browser identisch reagiert. Haptik ist optional per Feature Detection; kein Device darf auf Vibrationssupport angewiesen sein. Außerdem muss der Renderer WebGL-Context-Loss robust behandeln, weil mobile Browser Tabs pausieren und GPU-Kontexte verlieren können. citeturn20search6turn20search10turn20search2turn25search0turn22search8
+
+#### Empfohlener Zielstack
+
+| Schicht | Empfehlung | Begründung |
+|---|---|---|
+| Runtime | TypeScript | konsistente, testbare Datenmodelle |
+| Engine | Phaser 3 | Web-fokussiert, Input/Scenes/Rendering komplett |
+| UI Shell | React oder Vue | DOM-nahe Menüs, Shop, Settings, Accessibility |
+| State | klar getrennt: `metaState`, `runState`, `uiState` | weniger Coupling |
+| Storage lokal | IndexedDB | Offline-Saves, Inventar, Config |
+| Offline | Service Worker + CacheStorage | Shell und Assets schnell wiederherstellbar |
+| API | REST + OpenAPI | einfach, testbar, dokumentierbar |
+| Realtime optional | WebSocket | Ranked/Guild-Live-Features |
+| Backend | Node.js mit Fastify oder NestJS | schneller JSON/API-stack |
+| Datenbank | PostgreSQL | Inventar, Ledger, Profile |
+| Cache/Queues | Redis | Rate Limits, seasonal boards, transient queues |
+| Asset Delivery | CDN + object storage | niedrige Latenz, versionierte Bundles |
+| Observability | Sentry + OpenTelemetry | Crash, Latency, Session-Replay ohne Overreach |
+
+#### Datenmodelle
+
+| Modell | Kernfelder | Zweck |
+|---|---|---|
+| `Account` | id, authType, locale, consentFlags, createdAt | Identität |
+| `Profile` | accountId, xp, chaptersUnlocked, masteryStars, currencies | Meta-Fortschritt |
+| `HeroProgression` | heroId, level, talentNodes, mastery, skinId | Heldendaten |
+| `GearItem` | itemId, slot, family, rarity, level, locked, source | Ausrüstung |
+| `Inventory` | accountId, gearIds, trinkets, blueprints, cosmetics | Besitz |
+| `RunState` | runId, mode, chapterId, seed, heroId, hp, wave, blessings, boardMods | laufender Run |
+| `EconomyLedger` | entryId, accountId, reason, currency, delta, timestamp | fälschungssicherer Verlauf |
+| `SeasonPassState` | seasonId, trackXp, claimedRewards, premiumOwned | Saisonlogik |
+| `LeaderboardEntry` | boardId, accountId, score, normalizedPower, rank | Rankings |
+| `Guild` optional | guildId, members, permissions, chatState | Social-Modul |
+| `AnalyticsEvent` | sessionId, eventName, payload, ts | Telemetrie |
+
+#### Kern-APIs
+
+| Endpoint | Methode | Zweck |
+|---|---|---|
+| `/v1/config` | GET | Live-Konfiguration, Kapitel, Drop-Tables |
+| `/v1/auth/guest` | POST | Gastprofil |
+| `/v1/profile` | GET | Profil laden |
+| `/v1/profile/sync` | POST | lokales Save mit Cloud abgleichen |
+| `/v1/run/start` | POST | Run eröffnen, Seed vergeben |
+| `/v1/run/{id}/wave` | POST | Wave-Ergebnis committen |
+| `/v1/run/{id}/board` | POST | Board-Auszahlung committen |
+| `/v1/run/{id}/finish` | POST | Sieg/Niederlage finalisieren |
+| `/v1/inventory/merge` | POST | Merge/Crafting |
+| `/v1/shop/catalog` | GET | Kosmetikshop |
+| `/v1/shop/purchase` | POST | Kaufabschluss |
+| `/v1/leaderboards/{boardId}` | GET | Ranglisten |
+| `/v1/matchmaking/join` | POST | optionales Ranked |
+| `/v1/mod/report` | POST | Report/Mute-Workflows |
+
+### Assets, QA und Roadmap
+
+#### Asset- und Art-Spezifikation
+
+| Asset-Typ | Spezifikation | Launch-Menge |
+|---|---|---:|
+| Hero-Sprites | 96×96 oder 128×128, Idle/Attack/Hit/Death/Cast, atlas-fähig | 8 Helden |
+| Enemy-Sprites | 96×96, 4–6 Animationen je Typ | 13 Normals/Elites |
+| Boss-Sprites | 160×160 bis 256×256, Phasenwechsel-Sets | 5 Bosse |
+| Hintergrundlayer | 3 Parallax-Layer pro Welt, komprimiert als WebP/AVIF | 5 Welten |
+| UI-Atlas | Buttons, Panels, Icons, Status, Focus-Rings | 1 kompletter Satz |
+| Effekt-Sprites | Burn, Freeze, Crit, Heal, Execute, Shield, Summon | 40–60 Effekte |
+| Audio SFX | UI, Treffer, Status, Boss, Reward | 120–180 One-Shots |
+| Musik | 1 Home-Track, 5 Welt-Loops, 5 Boss-Loops | 11 Loops |
+| Lokalisierung | JSON/ICU-Strings, dynamische Textboxen | de-DE, en-US Minimum |
+| Kosmetik | Skins, Trails, Board-Themes, Profile-Badges | 20–30 Items |
+
+#### QA-Checkliste
+
+| Bereich | Must-pass-Kriterien |
+|---|---|
+| Kernkampf | Turn Order korrekt, Crit/Execute/Boss-Conversion korrekt, Reflect caps korrekt, Summons sterben/triggern deterministisch |
+| Board-System | identischer Input + Seed = identischer Output, Mindestpayout greift, Tap-Alternative vollständig |
+| Economy | Reward-Kurven, Fail-Rewards, Merge-Regeln, Preislogik, keine negativen Ledger-Zustände |
+| Save | Offline-Save intakt, Cloud-Konfliktlösung sauber, kein Duplicate-Claiming |
+| Performance | 60-FPS-Ziel auf Midrange, Speicher stabil über 20 Runs, Background/Resume ohne Softlock |
+| Browser-Matrix | iOS Safari, Chrome Android, Samsung Internet, Desktop Chrome/Safari/Firefox |
+| Accessibility | Touch Targets, Screenreader-Basislabels in Menüs, Reduced Motion, Contrast, Focus sichtbar |
+| Security | signierte kritische Requests, Replay-Schutz, Kaufbelege servervalidiert |
+| Social optional | Mute/Block/Report, Chat-Cooldowns, AFK/Disconnect, abusive-name-Filter |
+| Live Ops | Season-Reset, Leaderboards, Shoprotation, Eventkalender, Timezone-Sicherheit |
+
+#### Implementierungsprioritäten
+
+| Feature | Priorität | Aufwand | Bemerkung |
+|---|---|---|---|
+| Kernkampf + 15-Wellen-Loop | P0 | Hoch | Herz des Produkts |
+| Kugel-Board + Upgrade-Draft | P0 | Hoch | Signature-System |
+| 4 Heroes im Vertical Slice | P0 | Mittel | Woodie, Cowboy, Barbarian, Eiva |
+| 3 Welten + 9 Gegner + 3 Bosse | P0 | Hoch | MVP-Inhalt |
+| Gear, Merge, Crafting | P0 | Hoch | Meta-Fortschritt |
+| PWA, Offline, lokaler Save | P0 | Mittel | Mobile-Web-Verteilung |
+| Telemetrie + Fehlertracking | P0 | Mittel | Soft-Launch-Basis |
+| 4 weitere Heroes | P1 | Hoch | Felorc, Rexx, Druid, Mammon |
+| 2 weitere Welten + 2 Bosse | P1 | Hoch | Launch v1.0 |
+| Kosmetikshop + kosmetischer Pass | P1 | Mittel | fair monetarisieren |
+| Async-Challenges/Leaderboards | P1 | Mittel | vor echtem PvP |
+| Ranked normalisiert | P2 | Hoch | nur nach Balance-Stabilität |
+| Guilds/Chat | P3 | Hoch | nur mit Moderationsbudget |
+
+#### Roadmap mit Meilensteinen
+
+| Meilenstein | Inhalt | Aufwand |
+|---|---|---|
+| Vorproduktion | GDD finalisieren, IP-Entscheid, Data-Sheets, Tech-Spikes für Board und PWA | Hoch |
+| Vertical Slice | 1 Welt, 4 Heroes, 6 Gegner, 1 Boss, lokaler Save, erste UI | Hoch |
+| Alpha | 3 Welten, Core-Economy, Gear, Merge, 9 Gegner, 3 Bosse, Analytics | Hoch |
+| Beta/Soft Launch | 5 Welten, 8 Heroes, Cloud-Sync, Shop, Accessibility, Balance-Tuning | Hoch |
+| Launch v1.0 | Content-Freeze, Live-Config, KPI-Watching, Soft-Fail-Schutz | Mittel |
+| Post-Launch | Async-Challenges, kosmetische Saison, optional Ranked | Mittel bis Hoch |
+
+Die technische Erfolgskontrolle sollte sich nicht nur auf Crashfreiheit stützen, sondern auf echte Responsiveness. web.dev definiert INP als Metrik für die Reaktionsfähigkeit über die gesamte Seitensitzung; ein Wert von höchstens 200 ms gilt als gut. Für ein Mobile-Web-Spiel ist das keine Kür, sondern Pflicht. citeturn38view2
