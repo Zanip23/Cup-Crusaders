@@ -31,7 +31,7 @@ zentralen State über klar definierte Aktionen, **besitzen** ihn aber nicht.
 ### 1. `GameStateManager` (core/state)
 - Hält den gesamten [Game State](09-game-state.md).
 - Mutationen **nur** über typisierte Aktionen/Reducer (vorhersehbar, testbar).
-- Verantwortlich für Persistenz via `SaveRepository` (localStorage).
+- Verantwortlich für Persistenz via `SaveRepository` (IndexedDB, ADR-008).
 - Stellt `select(...)`-Getter bereit; Szenen lesen nie rohe interne Felder.
 
 ### 2. `EventBus` (core/events)

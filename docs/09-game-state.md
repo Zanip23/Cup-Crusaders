@@ -11,7 +11,7 @@ ist in **drei Scopes** geteilt:
 GameState
 ├── version            // Save-Schema-Version (Migration)
 │
-├── meta               // PERSISTENT (localStorage)
+├── meta               // PERSISTENT (IndexedDB)
 │   ├── highestLevel
 │   ├── currencies
 │   │   ├── gold
@@ -90,19 +90,23 @@ type Action =
 ---
 
 ## Persistenz (SaveRepository)
-- Interface `SaveRepository` kapselt Speicherung; Default-Impl. = **localStorage**.
+- Interface `SaveRepository` kapselt Speicherung; Default-Impl. = **IndexedDB**
+  ([ADR-008](decisions.md)). IndexedDB statt localStorage, weil das Inventar
+  (hunderte `ItemInstance`) strukturierte, größere Daten umfasst.
+- **Offline-first PWA:** Ein **Service Worker** cached App-Shell & Assets; das Spiel
+  läuft ohne Netz. Kein Backend/Cloud-Sync (ADR-004).
 - Gespeichert wird **`meta` + `settings`** (nicht der flüchtige `run` —
   optional als separater "Resume-Slot").
-- **Throttled Autosave** (z. B. debounced bei relevanten Meta-Änderungen:
-  Item erhalten, gemergt, gelevelt) — nicht jeden Frame.
+- **Throttled Autosave** (debounced bei relevanten Meta-Änderungen:
+  Item erhalten, gemergt, gelevelt) — nicht jeden Frame; IndexedDB-Writes sind async.
 - **Serialisierung:** nur **Instances/IDs** speichern, nie ganze Defs (Content
   kommt aus Registries). Hält Saves klein und robust gegen Content-Updates.
 
 ```ts
-interface SaveRepository {
-  load(): SavedState | null;
-  save(state: SavedState): void;
-  clear(): void;
+interface SaveRepository {            // async wegen IndexedDB
+  load(): Promise<SavedState | null>;
+  save(state: SavedState): Promise<void>;
+  clear(): Promise<void>;
 }
 ```
 
@@ -120,5 +124,8 @@ interface SaveRepository {
 
 ## Determinismus / Rng
 - `run.seed` speist einen **seedbaren PRNG** (`core/rng/Rng.ts`).
-- Drop-Streuung und Shop-Kartenziehung nutzen diesen Rng → reproduzierbare Runs,
-  testbare Balancing-Szenarien und reproduzierbare Bug-Reports.
+- Genutzt für **Shop-Kartenziehung**, **Loot-Tabellen** und **Gegner-Spawn-Varianz**
+  → testbar und reproduzierbar.
+- **Ausnahme Drop-Phase:** Das Pachinko-Board ist **physik-autoritativ** (ADR-009)
+  und damit **nicht** exakt reproduzierbar — bewusst so gewählt für ein realistisch-
+  emergentes Spielgefühl.

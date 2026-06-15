@@ -10,7 +10,10 @@
 | Sprache | **TypeScript** | ^5.x |
 | Build/Dev | **Vite** | ^5.x |
 | UI-Overlays (Shop/HUD) | **HTML/CSS-DOM** über dem Canvas | nativ |
-| Persistenz | **localStorage** (gekapselt, später austauschbar) | nativ |
+| Auslieferung | **PWA** (Web App Manifest) — installierbar, offline-first | nativ |
+| Persistenz | **IndexedDB** (gekapselt hinter `SaveRepository`) | nativ |
+| Offline/Cache | **Service Worker + CacheStorage** (App-Shell & Assets) | nativ |
+| Input | **Pointer Events** (Touch/Maus/Pen einheitlich) | nativ |
 | Tests | **Vitest** (Logik/Reducer), evtl. Playwright (E2E) später | ^2.x |
 | Lint/Format | **ESLint + Prettier** | aktuell |
 
@@ -77,11 +80,24 @@ Interne Referenzauflösung **720×1280 (9:16)**. Begründung & Safe-Areas siehe
 
 ---
 
+## PWA & Offline-First ([ADR-008](decisions.md))
+- **Installierbar** über ein **Web App Manifest** (Name, Icons, Portrait-Orientation,
+  `display: standalone`) → „Zum Homescreen hinzufügen".
+- **Service Worker** cached App-Shell, Core-Assets und einen Offline-Fallback →
+  schnelle Warmstarts und Spielbarkeit ohne Netz.
+- **IndexedDB** als lokaler Speicher (statt localStorage), weil das wachsende
+  Inventar (hunderte `ItemInstance`, siehe [09](09-game-state.md)) strukturierte,
+  größere Clientdaten braucht.
+- Vollständig kompatibel mit **ADR-004** (Single-Player, kein Backend): kein Server,
+  kein Account, kein Cloud-Sync nötig.
+- **WebGL-Context-Loss** robust behandeln (mobile Tabs verlieren GPU-Kontexte).
+
 ## Abhängigkeits-Philosophie
 - **Wenige Dependencies.** Game-Engine + Build-Tool + Test-Runner. Keine schweren
   UI-Frameworks.
-- **Persistenz hinter einem Interface** (`SaveRepository`), damit localStorage
-  später durch IndexedDB oder ein Backend ersetzt werden kann, ohne Spielcode
-  anzufassen.
+- **Persistenz hinter einem Interface** (`SaveRepository`), Default-Impl. IndexedDB
+  — austauschbar, ohne Spielcode anzufassen.
+- **Feature Detection statt User-Agent-Sniffing** (Vibration, ScreenOrientation,
+  Audio-Latenz sind nicht überall verfügbar).
 - Alle Content-Daten als **typisierte Config-Module/JSON**, nie hartcodiert in
   Logik.

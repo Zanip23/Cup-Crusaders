@@ -14,8 +14,9 @@ Vollständige Architektur- und Design-Doku. **Kein Spielcode.**
 ### M1 — Projekt-Skelett & leerer Loop
 **Ziel:** Den 3-Phasen-Loop "leer" durchklicken.
 - Vite + TS + Phaser 3 Setup, Portrait-Config (720×1280), Pixel-Art-Flags.
+- **PWA-Grundgerüst:** Web App Manifest + Service Worker (App-Shell-Cache).
 - `core/`: `GameStateManager` (Scopes, Reducer, Actions), `EventBus`
-  (typisierte Events), `SaveRepository` (localStorage-Stub), `Rng`.
+  (typisierte Events), `SaveRepository` (IndexedDB-Stub, async), `Rng`.
 - Leere Szenen: Boot → Combat → Drop → Shop → Combat (Loop), nur mit
   Platzhalter-Buttons ("Welle gewonnen", "Drop fertig", "Weiter").
 - `transfer`-Kanal funktioniert: eine Test-Ballzahl fließt korrekt durch alle
@@ -24,16 +25,17 @@ Vollständige Architektur- und Design-Doku. **Kein Spielcode.**
   korrekt übergeben; Reload bricht nichts.
 
 ### M2 — Kampf-Phase (Vertical Slice)
-- `StatEngine` + `EffectSystem` (mind. `addModifier`, `onHit`, `onKill`).
-- Held mit Auto-Attack (Arcade), 1 Projektiltyp.
-- `WaveSpawner` + 1 Gegnertyp + 1 Boss; HP-Balken, Hit-Flash, Floating Text.
-- **Ball-Drops** mit Tween in die Cup-UI → füllt `transfer.ballsFromCombat`.
+- `StatEngine` (inkl. `StatCaps`) + `EffectSystem` (mind. `addModifier`, `onHit`, `onKill`).
+- **Rundenbasiertes** Auto-Battle (Turn-Phasen, ADR-005), 1 Held (`HeroDef`).
+- `WaveSpawner` + 1 Gegnertyp + 1 Boss, **15-Wellen-Default**; HP-Balken, Hit-Flash,
+  Floating Text, Wellen-Reward-Kurve (auch bei Niederlage).
+- **Ball-Drops** (Tod + Treffer-Chance) mit Tween in die Cup-UI → `transfer.ballsFromCombat`.
 - Top-Bar (Welle X/N), Held-HP. Ability-Deck-Zone reserviert (leer).
 
 ### M3 — Drop-Phase (Vertical Slice)
-- `DropScene` mit Matter.js, 1 `BoardDef`.
-- Becher (Drag + Tap), Pegs, **Tore** (x2, +5), **Bins** (x1/x5/x10).
-- `DropResolver` (Value-Carrying-Balls) + Performance-Cap.
+- `DropScene` mit Matter.js, 1 `BoardDef`, **physik-autoritativ** (ADR-009).
+- Becher (Drag **+ Tap-Alternative**, WCAG), Pegs, **Tore** (x2, +5), **Bins** (x1/x5/x10).
+- `DropResolver` summiert echte Physik-Ergebnisse (Value-Carrying) + Performance-Cap.
 - Near-Miss-Layout (zentraler x10). Ergebnis → `transfer.ballsFromDrop`.
 
 ### M4 — Shop-Phase (Vertical Slice)
@@ -47,7 +49,7 @@ Vollständige Architektur- und Design-Doku. **Kein Spielcode.**
 - `MetaScene` (Hauptmenü): Inventar, 6 Ausrüstungs-Slots, Equip.
 - Rarity, **Merge** (3→1), Item-Level (Gold/Baupläne), Boss-Item-Drops.
 - Permanente Meta-Skills (Modifier mit `scope:'meta'`).
-- Persistenz von `meta` + Save-Versionierung.
+- Persistenz von `meta` in **IndexedDB** + Save-Versionierung; Hero als Daten-Entity.
 
 ### M6 — Content-Breite & Polish
 - Mehrere Welten/Level, Gegner-Sets, Boards, große Item-/Upgrade-Pools.
@@ -65,7 +67,7 @@ dazukommt. Erst wenn der leere Loop robust läuft, füllen wir M2–M4.
 ---
 
 ## Bewusst aufgeschoben (Backlog)
-- Cloud-Saves (lokales localStorage genügt; kein Backend im Scope).
+- Cloud-Saves (lokale IndexedDB genügt; kein Backend im Scope).
 - Resume-after-reload mitten im Run (zunächst nur Meta persistent).
 - Reroll/Pity im Shop, Telemetrie-Dashboards.
 

@@ -52,13 +52,17 @@ RUN
 > Level via `LevelDef.dropCadence` auf `'levelEnd'` überschreibbar (z. B. für
 > Survival-Bonus-Level). Siehe [04 – Kampf-Phase](04-combat-phase.md).
 
-### Phase 1 — Kampf (Auto-Battler)
+### Phase 1 — Kampf (Rundenbasiertes Auto-Battle)
 
-- Held steht statisch **links**, Gegner spawnen **rechts** und laufen heran.
-- Held greift automatisch den nächsten Gegner in Reichweite an (Projektile).
-- Trefferfeedback: Floating Combat Text + weißer Hit-Flash.
-- Besiegte (auf höheren Stufen auch getroffene) Gegner droppen **Bälle**, die in
-  einer Animation nach oben in die **Cup-UI** fliegen und dort gezählt werden.
+- **Rundenbasiert** (Turn-Phasen), nicht Echtzeit ([ADR-005](decisions.md)) — in
+  Side-Scrolling-Optik: Held steht statisch **links**, Gegner formieren sich **rechts**.
+- Held greift im Held-Zug automatisch an; der Spieler schaut zu (Active Ability Deck
+  optional, Post-MVP).
+- Trefferfeedback: Floating Combat Text + weißer Hit-Flash (bleibt „wuchtig").
+- Besiegte Gegner (und per Chance auch Treffer) droppen **Bälle**, die in einer
+  Animation nach oben in die **Cup-UI** fliegen und dort gezählt werden.
+- **Default 15 Wellen** (14 + Boss); jeder Wellenabschnitt belohnt auch bei
+  späterer Niederlage ([ADR-007](decisions.md)).
 - **Phasenende:** Welle leer → exakte Ballzahl wird an die Drop-Phase übergeben.
 
 ### Phase 2 — Drop (Pachinko-Physik)

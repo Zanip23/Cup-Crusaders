@@ -37,40 +37,45 @@ besteht aus:
 
 ---
 
-## Wie sich Bälle "vermehren" (Resolver-Modell)
+## Ökonomie-Modell: physik-autoritativ ([ADR-009](decisions.md))
 
-Echte Tausende von Matter-Bodies sind auf Mobile teuer. Daher trennen wir
-**Visualisierung** und **Zählung**:
+> **Entscheidung:** **Die echte Matter.js-Physik bestimmt das Ergebnis** — kein
+> seed-basiertes „Steering", keine verdeckte Verteilung. Wo ein Ball landet, ergibt
+> sich allein aus der Simulation. Das ist bewusst „realistisch/emergent" gewählt.
 
-> **Kernidee:** Ein Tor verändert nicht zwingend die *physische* Ballzahl, sondern
-> einen **Wert/Gewichtung**, den jeder Ball trägt. Der `DropResolver` summiert am
-> Ende exakt.
-
-Zwei kombinierbare Strategien:
-
-| Strategie | Beschreibung | Einsatz |
-|---|---|---|
-| **Value-Carrying Balls** | Jeder physische Ball trägt einen `value` (Start 1). Tor `x2` verdoppelt den `value` des durchfallenden Balls; `+5` addiert. Bin-Multiplikator multipliziert beim Auffangen. Finalsumme = Σ(`ball.value × bin.mult`). | Standard — wenige Bodies, große Zahlen möglich |
-| **Spawn-on-Pass** | Tor `+5`/`x2` spawnt zusätzliche *physische* Bälle (begrenzt durch ein Hard-Cap). | Nur für visuell wichtige, kleine Mengen |
-
-**MVP nutzt Value-Carrying Balls** mit optionalem visuellem "Aufblitzen/Vergrößern"
-des Balls bei Tor-Durchgang, plus begrenztem Spawn für das Gefühl von "mehr Bällen".
+**Repräsentation (Value-Carrying Balls):** Jeder Ball ist ein echter Matter-Body
+und trägt einen `value` (Start 1). Passiert er physisch ein Tor, ändert sich sein
+`value`; fängt ihn ein Bin, multipliziert dessen Faktor. Der `DropResolver` summiert
+am Ende nur die tatsächlich physisch entstandenen Ergebnisse — er **steuert nichts**.
 
 ```
 ball.value = 1
-durch Gate(x2): ball.value *= 2
-durch Gate(+5): ball.value += 5
-landet in Bin(x10): contribution = ball.value * 10
+physisch durch Gate(x2): ball.value *= 2
+physisch durch Gate(+5): ball.value += 5
+physisch in Bin(x10):    contribution = ball.value * 10
 run.transfer.ballsFromDrop = Σ contribution über alle Bälle
 ```
 
-### Performance-Leitplanken
+- **Skill zählt direkt:** Wo du den Becher positionierst und ausschüttest,
+  beeinflusst über die Physik real das Ergebnis.
+- **Optional `Spawn-on-Pass`:** Ein Tor `+5`/`x2` darf zusätzlich *physische* Bälle
+  spawnen (begrenzt durch den Body-Cap) für das „mehr Bälle"-Gefühl.
+
+### Bewusste Trade-offs (so gewählt)
+- **Nicht exakt reproduzierbar** über Geräte/Frames hinweg (Float-Determinismus von
+  Matter ist nicht garantiert). Akzeptiert für das realistische Gefühl.
+- **Balancing empirisch:** Erwartungswert wird **nicht** per Formel garantiert,
+  sondern über **Board-Geometrie** (Peg-/Bin-/Tor-Layout) per Playtest & Telemetrie
+  getunt (siehe [10](10-content-pipeline-and-balancing.md)).
+
+### Performance- & Sicherheits-Leitplanken (Optik/Stabilität, kein Steering)
 - **Hard-Cap** an gleichzeitigen Matter-Bodies (z. B. 150–250) → Becher tropft
   gestreut, statt alles auf einmal.
-- Bälle, die in Bins landen oder ruhen, werden **despawnt** und nur ihr `value`
-  verbucht.
-- `value` wird als Integer/Big-genug-Typ geführt, um Overflow bei großen
-  Multiplikatorketten zu vermeiden.
+- Bälle, die in Bins landen oder zu lange ruhen, werden **despawnt** und nur ihr
+  `value` verbucht (siehe Timeout-Sicherung unten).
+- `value` als Integer/Big-genug-Typ gegen Overflow bei langen Multiplikatorketten.
+- Optionaler, großzügiger **Auszahlungs-Hard-Cap pro Welle** nur als
+  Exploit-Sicherung (standardmäßig sehr hoch; verändert normales Spiel nicht).
 
 ---
 
@@ -81,10 +86,10 @@ hat, **"fast" den riesigen x10** getroffen zu haben.
 - Der `x10`-Bin liegt zentral, flankiert von attraktiven, aber kleineren Bins.
 - Peg-Anordnung lenkt Bälle visuell **nahe** an den Jackpot, ohne ihn zu
   garantieren.
-- **Ehrlichkeit-Leitplanke:** Wir manipulieren das **Layout/Gefühl**, nicht
-  verdeckt die Mathematik gegen den Spieler. Der seedbare `Rng` und die Physik
-  bleiben fair und reproduzierbar; "Trickserei" beschränkt sich auf
-  Wahrnehmungsdesign (Platzierung, Kamera, SFX, Haptik).
+- **Ehrlichkeit-Leitplanke:** Wir manipulieren nur das **Layout/Gefühl**, nie
+  verdeckt das Ergebnis. Da die **echte Physik autoritativ** ist (ADR-009), gibt es
+  ohnehin keine versteckte Mathematik gegen den Spieler; „Trickserei" beschränkt
+  sich auf Wahrnehmungsdesign (Bin-Platzierung, Peg-Anordnung, Kamera, SFX, Haptik).
 
 ---
 

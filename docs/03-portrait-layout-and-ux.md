@@ -111,11 +111,24 @@ Abschnitt *Ability*). Beispiele:
 
 ---
 
+## Accessibility & Eingabe ([ADR-011](decisions.md))
+- **Pointer Events** als einheitliche Eingabeschicht (Touch/Maus/Pen in einem Modell).
+- **Touch-Ziele ≥ 48×48 px** (CSS) für alle interaktiven Elemente in Kampf, Drop,
+  Shop (W3C ≥24, Apple ≥44 pt, Material ≥48 dp → wir nehmen 48 als Untergrenze).
+- **Drag braucht immer eine Tap-Alternative** (WCAG 2.5.7): Die Becher-Steuerung im
+  Drop ist per Drag *und* per Tap/Buttons („nach links/rechts", „ausschütten")
+  bedienbar — Pflicht, kein Nice-to-have.
+- **Sichtbare Focus-States** (WCAG 2.4.x) für alle Buttons/Karten.
+- **Reduced Motion** respektieren (`prefers-reduced-motion`): Floating Text/Shake
+  abschwächen.
+- Einhandbedienung: alle Interaktionen in der unteren Daumen-Zone.
+
 ## Responsiveness & Safe Areas
 - **Safe-Area-Insets** (`env(safe-area-inset-*)`) für Notch/Home-Indicator in
   allen DOM-Overlays respektieren.
-- Min. Touch-Ziel **48×48 px** (CSS) für alle Buttons.
-- Landscape: explizite **"Bitte Gerät drehen"-Sperre** (Portrait-only-Spiel).
+- **Portrait-first, Landscape-safe:** `ScreenOrientation.lock()` ist nicht überall
+  robust → kein harter Lock, sondern **reflow-fähiges Layout** + freundlicher
+  „Bitte Gerät drehen"-Hinweis im Querformat.
 - Skalierungs-Anker: Top-Bar oben verankert, Ability-Deck unten verankert, Bühne
   dehnt sich dazwischen.
 

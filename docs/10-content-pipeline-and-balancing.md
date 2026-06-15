@@ -60,6 +60,21 @@ type ScalingCurve =
   - Shop-Kosten skalieren mit Welle (`costScalingPerWave`), damit Bälle relevant
     bleiben.
 
+### Balance-Caps ([ADR-010](decisions.md))
+Harte Obergrenzen gegen Endgame-Degeneration (Execute-/Reflect-/%-Snowballs) liegen
+als `StatCaps`-Datentabelle vor und werden in der StatEngine erzwungen. Vollständige
+Werte in [08 §1.1a](08-data-schemas.md) (DR 75 %, Dodge 35 %, Lifesteal 20 %, Execute
+non-boss 9 % / Boss-Conversion, Thorns 50 %, CritChance 60 % soft, Rerolls 5).
+
+### Drop-Board: empirisches Balancing ([ADR-009](decisions.md))
+Da das Board **physik-autoritativ** ist (kein EV-Steering), wird der mittlere
+Auszahlungs-Multiplikator **nicht per Formel garantiert**, sondern über
+**Board-Geometrie** getunt: Peg-Dichte/-Versatz, Bin-Breiten/-Positionen,
+Tor-Werte, Restitution. Vorgehen: Layout bauen → mit seed-variierten Massentests
+und Telemetrie (`cup_drop_resolved`: `inputBalls`/`outputBalls`) den Median in den
+Zielkorridor schieben. Optionaler großzügiger **Auszahlungs-Hard-Cap pro Welle** nur
+als Exploit-Sicherung.
+
 ---
 
 ## Near-Miss & Wahrnehmung (siehe auch docs/05)

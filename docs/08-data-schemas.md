@@ -26,12 +26,31 @@ enum StatKey {
   // Held / Kampf
   MaxHp, Armor, AttackDamage, AttackSpeed, ProjectileCount,
   Pierce, RicochetBounces, CritChance, CritMultiplier, LifestealPct,
+  Dodge, Execute, Thorns, ExtraAttack, SummonPower,
   // Pachinko
   StartingBalls, PegDensity, MagnetStrength, BallRestitution,
   // Ökonomie
-  BallDropBonus, BallDropOnHitChance, GoldFind, BlueprintFind,
+  BallDropBonus, BallDropOnHitChance, GoldFind, BlueprintFind, Rerolls,
 }
 ```
+
+### 1.1a Balance-Caps (gegen Endgame-Degeneration)
+Aus den dokumentierten Meta-Problemen des Vorbilds (Execute-/Reflect-/%-Builds)
+abgeleitet ([ADR-010](decisions.md)). Caps werden **in der StatEngine** nach der
+Berechnung als Klammerung (`clamp`) erzwungen:
+
+| Stat | Cap | Anmerkung |
+|---|---|---|
+| effektive Schadensreduktion (aus Armor) | **75 %** | Formel: `dmg × 100 / (100 + Armor)` |
+| Dodge | **35 %** | Boss-Angriffe ignorieren 50 % Dodge |
+| Lifesteal | **20 %** | kein Heal aus Reflect/Thorns |
+| Execute (Non-Boss) | **9 %** | gegen Bosse **nie tödlich** → True-Damage-Conversion |
+| Thorns | **50 %** | vor Armor des Gegners, gecappt |
+| CritChance | **60 %** (soft) | darüber abnehmender Ertrag |
+| Rerolls (gespeichert) | **5** | nie per Echtgeld |
+
+> Diese Caps sind **Daten** (eine `StatCaps`-Tabelle), kein Code-Branch — Tuning
+> ohne Refactor. Siehe [10 – Balancing](10-content-pipeline-and-balancing.md).
 
 ### 1.2 Modifier
 Jeder Bonus im Spiel ist ein **Modifier**. Quelle und Lebensdauer sind explizit.
@@ -115,6 +134,29 @@ interface Effect {
 ---
 
 ## 3. Content-Schemas
+
+### 3.0 Hero
+**Scope-Entscheidung ([ADR-006](decisions.md)):** Launch mit **einem** Helden,
+aber als **Daten-Entity** modelliert, damit weitere Helden später ohne
+Engine-Umbau hinzukommen. Der Held ist die Quelle der Basis-Stats, in die alle
+Modifier fließen.
+
+```ts
+interface HeroDef {
+  id: string;                  // 'archer'
+  name: string;
+  sprite: string;              // Atlas-Key (Idle/Attack/Hit/Death/Cast)
+  baseStats: Partial<Record<StatKey, number>>;   // Basis vor Modifiern
+  signature?: {                // optionale Signaturmechanik (Post-MVP)
+    name: string;
+    effects: Effect[];
+  };
+  startingAbilities?: string[];   // Ability-IDs für den Active Ability Deck
+  levelBreakpoints?: number[];    // Stufen mit Power-Spikes (z.B. 3,5,8,11,15)
+}
+```
+> Der **eine** MVP-Held nutzt nur `baseStats`; `signature`/Roster sind vorbereitet,
+> aber nicht im MVP-Scope.
 
 ### 3.1 Enemy
 ```ts
