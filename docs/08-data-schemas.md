@@ -228,7 +228,7 @@ interface UpgradeDef {
 
 ### 3.4 Item (Ausrüstung / Meta-Scope)
 ```ts
-type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';   // ADR-013
 type EquipSlot = 'weapon' | 'helmet' | 'armor' | 'gloves' | 'boots' | 'ring';
 
 interface AffixDef {

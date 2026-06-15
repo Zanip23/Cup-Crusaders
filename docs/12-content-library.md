@@ -92,9 +92,10 @@ Content-Daten hinterlegt.
 (→ `ItemBaseDef`/`ItemInstance`, [08](08-data-schemas.md) §3.4;
 Slots & Merge in [07](07-meta-progression-and-equipment.md))
 
-Slots: Waffe, Ring, Handschuhe, Helm, Brust, Stiefel. Raritäten-Skalierung auf den
-Basiseffekt: **1.0 / 1.25 / 1.6 / 2.0 / 2.4** (Common→Mythic). **Original-Setnamen**
-(nicht die des Vorbilds):
+Slots: Waffe, Ring, Handschuhe, Helm, Brust, Stiefel. **5 Raritäten** (an den Report
+angeglichen, [ADR-013](decisions.md)): **Common · Rare · Epic · Legendary · Mythic**
+(kein „Uncommon"). Skalierung auf den Basiseffekt: **1.0 / 1.25 / 1.6 / 2.0 / 2.4**
+(Common→Mythic). **Original-Setnamen** (nicht die des Vorbilds):
 
 | Set | Fokus | Beispiel-Setboni (2er / 4er / 6er) |
 |---|---|---|

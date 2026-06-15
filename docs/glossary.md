@@ -20,7 +20,7 @@ Damit Doku, Code und Gespräche dieselbe Sprache sprechen.
 | **Item** | Meta-Scope-Ausrüstung mit Rarität/Level/Affixen. (`ItemBaseDef` / `ItemInstance`) |
 | **Affix** | Einzelner Stat-Bonus auf einem Item. |
 | **Merge** | 3 gleiche Items → 1 Item höherer Rarität. |
-| **Rarity** | Common → Uncommon → Rare → Epic → Legendary. |
+| **Rarity** | Common → Rare → Epic → Legendary → Mythic (5 Stufen, ADR-013). |
 | **Ability** | Aktive, cooldown-basierte Fähigkeit im Active Ability Deck. (`AbilityDef`) |
 | **Active Ability Deck** | Untere Bildschirmzone im Kampf für aktive Eingriffe. |
 | **Stat** | Numerischer Spielwert (z. B. AttackDamage). (`StatKey`) |

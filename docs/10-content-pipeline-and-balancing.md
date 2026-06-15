@@ -89,6 +89,9 @@ als Exploit-Sicherung.
 - Optionale, lokale Aggregation: durchschnittlicher Drop-Multiplikator, Win-Rate
   pro Welle, beliebteste Upgrades.
 - Hilft, Korridore datenbasiert nachzujustieren (kein Online-Tracking nötig im MVP).
+- **KPI-Zielwerte & Event-Schema:** siehe [13 – KPIs & Analytics](13-kpis-and-analytics.md)
+  ([ADR-014](decisions.md)) — client-lokal/opt-in. `cup_drop_resolved`
+  (`inputBalls`/`outputBalls`) ist der zentrale Hebel fürs empirische Drop-Balancing.
 
 ---
 
