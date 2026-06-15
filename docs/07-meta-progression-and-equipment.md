@@ -30,9 +30,13 @@ Items liefern Boni als **Modifikatoren** über die
 
 ## Seltenheit (Rarity)
 ```
-Grau (Common) → Grün (Uncommon) → Blau (Rare) → Lila (Epic) → Rot (Legendary)
+Grau (Common) → Blau (Rare) → Lila (Epic) → Gold (Legendary) → Rot (Mythic)
 ```
+- **5 Stufen** (an den Recherche-Report angeglichen, [ADR-013](decisions.md)) — kein
+  „Uncommon" mehr, **Mythic** ist die neue Spitze.
 - Rarität bestimmt Anzahl/Stärke der Affixe und die Farbkodierung in der UI.
+- **Skalierung auf den Basiseffekt:** `1.0 / 1.25 / 1.6 / 2.0 / 2.4`
+  (Common→Mythic), siehe [12 – Content-Bibliothek](12-content-library.md).
 - Definiert als geordnete Enum mit Farbwerten in den Content-Daten.
 
 ---

@@ -166,6 +166,44 @@ Balancing-/Struktur-Referenz dienende Werte; Klartextnamen werden ersetzt.
 
 ---
 
+## ADR-013 — Raritäten an den Report angleichen (Mythic statt Uncommon)
+**Status:** ✅ entschieden (2026-06-15)
+**Kontext:** Das Schema (`docs/08`) führte `uncommon` und kein `mythic`, während die
+Content-Bibliothek (`docs/12`) bereits „Common→Mythic" referenzierte. Der externe
+Recherche-Report nennt die Stufen **Gewöhnlich, Selten, Episch, Legendär, Mythic**.
+Es bestand also gleichzeitig eine Report-Abweichung **und** ein doku-interner
+Widerspruch.
+**Entscheidung:** Raritäten an den Report angleichen: **Common · Rare · Epic ·
+Legendary · Mythic** (kein „Uncommon"). Skalierung auf den Basiseffekt unverändert
+**1.0 / 1.25 / 1.6 / 2.0 / 2.4** (Common→Mythic).
+**Begründung:** Beseitigt die interne Inkonsistenz (`docs/12` ↔ `docs/08`), folgt der
+Report-Vorlage und gibt der Merge-/Crafting-Kette mit „Mythic" ein klares Top-Ziel.
+**Konsequenzen:** `Rarity`-Typ (`docs/08`), Farben/Reihenfolge (`docs/07`),
+Kostenbeispiel (`docs/06`), Bibliothek (`docs/12`) und Glossar aktualisiert.
+Merge-Kette = 5 Stufen. Falls je Saves existieren: in der Migrationspipeline
+(`docs/09`) `uncommon`→`rare` mappen.
+
+---
+
+## ADR-014 — KPI- & Analytics-Rahmen (client-lokal, opt-in)
+**Status:** ✅ entschieden (2026-06-15)
+**Kontext:** Der Report liefert KPI-Ziele (Retention, INP, FPS, Crash-free) und eine
+Analytics-Event-Liste; die Doku hatte bisher nur „Telemetrie für Balancing (später)"
+(`docs/10`).
+**Entscheidung:** KPI-/Analytics-Rahmen aus dem Report übernehmen, aber strikt
+**client-lokal & opt-in** — **keine** Server-Übertragung (kompatibel mit
+[ADR-004](decisions.md)). Monetarisierungs- und Social-KPIs/-Events entfallen (kein
+Payment, kein Multiplayer): gestrichen sind Kosmetik-Conversion, Refund-Rate,
+„Echtgeld-Machtvorteile", Harassment-Reports sowie die Events `cosmetic_purchase`
+und `report_player`.
+**Begründung:** Messbare Qualitäts-/Fairness-Ziele ohne Backend. INP ≤ 200 ms und
+FPS > 55 sind clientseitig messbar und für Mobile-Web zentral.
+**Konsequenzen:** Neues `docs/13`; `docs/10`/`README` verlinken. Populationsweite
+Aggregation nur, falls je ein optionales Backend käme (derzeit ausgeschlossen,
+ADR-004).
+
+---
+
 ## Vorlage für neue Einträge
 ```
 ## ADR-00X — <Titel>

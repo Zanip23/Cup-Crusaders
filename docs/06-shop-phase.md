@@ -35,12 +35,16 @@ Jede Karte zeigt: **Pixel-Icon · Name · Kurzbeschreibung · Kosten (Bälle) ·
 - Kosten richten sich nach **Rarität** und optional nach **Welle/Run-Fortschritt**.
 - Beispiel-Tabelle (Balancing, nicht final):
 
-| Rarität | Basis-Kosten | Beispiel-Upgrade |
+| Rarität | Basis-Kosten (Bälle) | Beispiel-Upgrade |
 |---|---|---|
-| Common | niedrig | +10 % Angriff, +Rüstung |
-| Uncommon | mittel | Attack Speed, +MaxHP |
-| Rare | hoch | Multi-Shot, Lifesteal |
-| Epic | sehr hoch | Ricochet, Magnet |
+| Common | 40 | +10 % Angriff, +Rüstung |
+| Rare | 90 | Attack Speed, +MaxHP |
+| Epic | 180 | Multi-Shot, Lifesteal |
+| Legendary | 320 | Ricochet, Magnet |
+| Mythic | 500 | seltene Build-Definierer |
+
+> Raritäten = 5 Stufen (Common→Mythic, [ADR-013](decisions.md)); die Basis-Kosten
+> entsprechen der Blessing-Kostenbasis aus [12](12-content-library.md).
 
 - Kosten dürfen mit der Welle leicht steigen (`costScalingPerWave`), damit Bälle
   ihren Wert über den Run behalten. Genauer in
