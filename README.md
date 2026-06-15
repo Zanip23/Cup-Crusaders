@@ -53,5 +53,35 @@ Deliverable. Lies in dieser Reihenfolge:
 
 ## Status
 
-🟡 **Phase 0 – Planung & Dokumentation.** Noch kein Spielcode. Implementierung
-beginnt nach Freigabe des Architekturplans (siehe Roadmap, Milestone M1).
+🟢 **M1 – Projekt-Skelett & leerer Loop (in Arbeit).** Das Vite + TS + Phaser-3-Setup
+steht, der 3-Phasen-Loop ist „leer" durchklickbar und der `transfer`-Kanal
+(Kampf → Drop → Shop) trägt die Ballzahl korrekt durch alle Phasen. Gameplay-Tiefe
+(M2–M4) folgt darauf, siehe [Roadmap](docs/11-roadmap-and-mvp.md).
+
+---
+
+## Entwicklung
+
+```bash
+npm install      # Abhängigkeiten installieren
+npm run dev      # Dev-Server (Vite, HMR) → http://localhost:5173
+npm run build    # Typecheck + Production-Build nach dist/
+npm test         # Vitest (reine Logik: Reducer, Rng)
+npm run lint     # ESLint
+```
+
+### Was in M1 steht
+
+- **Setup:** Vite, TypeScript (strict), Phaser 3, Portrait-Config (720×1280), Pixel-Art-Flags.
+- **PWA:** Web App Manifest + Service Worker (App-Shell-Cache, offline-first).
+- **`core/`:** `GameStateManager` (Scopes/Reducer/Actions/Selectors), typisierter
+  `EventBus`, `SaveRepository` (IndexedDB, async, mit Migrations-Gerüst), seedbarer `Rng`.
+- **`RunCoordinator`:** verdrahtet die Phasenübergänge event-getrieben (Szenen kennen
+  die nächste Szene nicht).
+- **Szenen:** `Boot → Combat → Drop → Shop → Combat` als Loop mit Platzhalter-UI.
+- **Resume after reload:** Der laufende Run wird (debounced) persistiert und beim
+  Neustart an der korrekten Phase fortgesetzt.
+- **Tests:** transfer-Vertrag (Reducer) und Rng-Determinismus.
+
+> Ordnerstruktur und Verträge folgen [docs/02 – Architektur](docs/02-architecture.md)
+> und [docs/09 – Game State](docs/09-game-state.md).

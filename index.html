@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#1a1a2e" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <title>Cup Crusaders</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #1a1a2e;
+        overflow: hidden;
+        font-family: system-ui, -apple-system, sans-serif;
+        /* Verhindert Pull-to-Refresh / Bounce auf Mobile */
+        overscroll-behavior: none;
+        touch-action: none;
+      }
+      #game {
+        width: 100vw;
+        height: 100vh;
+        /* Safe-Area-Insets respektieren (Notch / Home-Indicator) */
+        padding: env(safe-area-inset-top) env(safe-area-inset-right)
+          env(safe-area-inset-bottom) env(safe-area-inset-left);
+        box-sizing: border-box;
+      }
+      /* Hinweis im Querformat (Portrait-first, Landscape-safe — ADR-011) */
+      #rotate-hint {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: #e6e6f0;
+        background: #1a1a2e;
+        font-size: 1.1rem;
+        padding: 2rem;
+      }
+      @media (orientation: landscape) and (max-height: 520px) {
+        #rotate-hint {
+          display: flex;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="rotate-hint">📱 Bitte drehe dein Gerät ins Hochformat.</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
