@@ -57,9 +57,13 @@ tap(Card) ─► prüfe run.currency >= card.cost
           │        Karte als "gekauft" markieren / Overlay aktualisieren
           └─ nein ─► Karte ausgegraut / Feedback "zu wenig Bälle"
 ```
-- Ob **mehrere** Käufe pro Shop erlaubt sind oder **genau einer**, ist ein
-  Balancing-Flag (`maxPurchasesPerShop`). MVP-Vorschlag: mehrere Käufe erlaubt,
-  solange Bälle reichen → stärkt das Ressourcengefühl der Drop-Phase.
+- ✅ **Entschieden ([ADR-003](decisions.md)):** **Mehrere** Käufe pro Shop
+  erlaubt, solange Bälle reichen (`maxPurchasesPerShop: ∞`) → stärkt das
+  Ressourcengefühl der Drop-Phase und zahlt die Loop-Kopplung (Drop→Shop) aus.
+- Der "schmerzhafte Wahl"-Reiz entsteht über **Knappheit per Balancing**: Kosten
+  so setzen, dass man pro Shop typischerweise nur **1–2 von 3** Karten leisten
+  kann (`costScalingPerWave`). Beide Effekte — Entscheidung *und* Belohnung —
+  bleiben so erhalten.
 - **Upgrades wirken sofort** ab der nächsten Welle, weil sie über die
   [StatEngine](08-data-schemas.md)/`EffectSystem` in den Player State fließen.
 

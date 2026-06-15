@@ -44,6 +44,7 @@ Deliverable. Lies in dieser Reihenfolge:
 | 09 | [Game State](docs/09-game-state.md) | State-Form, Persistenz, Save-Versionierung |
 | 10 | [Content-Pipeline & Balancing](docs/10-content-pipeline-and-balancing.md) | Wie man hunderte Items/Gegner pflegt |
 | 11 | [Roadmap & MVP](docs/11-roadmap-and-mvp.md) | Vertical Slice, Milestones |
+| — | [Decision Log](docs/decisions.md) | Verbindliche Designentscheidungen (ADR-light) |
 | — | [Glossar](docs/glossary.md) | Einheitliche Begriffe |
 
 ---

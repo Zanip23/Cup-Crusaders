@@ -55,16 +55,28 @@ Sonderlogik.
 
 ## Ball-Drops (die Verbindung zur Drop-Phase)
 **Wichtigste Mechanik der Phase.**
-- Bei `enemy.death` (und optional bei `enemy.hit` auf höheren Stufen) droppt der
-  Gegner `ballDrop` Bälle (Wert aus der `Enemy`-Definition, ggf. modifiziert).
+
+Bälle entstehen aus **zwei Quellen** (Entscheidung [ADR-002](decisions.md)):
+
+1. **Bei Tod (garantiert):** `enemy.death` droppt `ballDrop` Bälle (Wert aus der
+   `Enemy`-Definition, ggf. modifiziert).
+2. **Bei Treffer (zufallsbasiert):** Jeder Treffer des Helden hat eine **Chance**
+   (`ballDropOnHitChance`, Start ~15 %), **1 Ball** abzuwerfen. Modelliert als
+   `onHit`-Effekt über das [Effekt-System](08-data-schemas.md) — keine Sonderlogik.
+
 - Bälle bleiben **nicht** liegen: kleine Tween-Animation **nach oben in die
   Cup-UI** (Top-Bar). Der Cup-Zähler zählt hoch.
 - Jeder gesammelte Ball erhöht `run.transfer.ballsFromCombat`.
 
 ```
-enemy.death ─► spawn ballDrop visuelle Bälle ─► tween → Cup-UI
-            ─► run.transfer.ballsFromCombat += enemy.ballDrop
+enemy.hit   ─► roll(ballDropOnHitChance) ─► ggf. +1 Ball  ─┐
+enemy.death ─► +ballDrop Bälle                            ─┤─► tween → Cup-UI
+                                                           └─► run.transfer.ballsFromCombat += n
 ```
+
+> **Warum Treffer-Drops?** Sie machen lange **Bosskämpfe** (viele Treffer,
+> langsamer Tod) ball-ergiebig und belohnen Attack-Speed/Multi-Shot doppelt.
+> Die Chance ist ein Balancing-Hebel, kein fester Wert.
 
 > **Vertrag:** Die an die Drop-Phase übergebene Zahl ist **exakt**
 > `run.transfer.ballsFromCombat`. Die visuelle Animation darf die Zahl nie
@@ -96,9 +108,13 @@ Zone reserviert/leer.
 
 ---
 
-## Offene Balancing-Parameter
-- `dropAfterEveryWave` vs. `dropAfterLevelOnly` (Loop-Frequenz).
-- Droppen Gegner Bälle nur bei Tod oder auch bei Treffer (Stufenabhängig)?
-- Ziel-Strategie des Auto-Attacks (vorderster / niedrigste HP / stärkster).
+## Balancing-Parameter
+**Entschieden** (siehe [Decision Log](decisions.md)):
+- ✅ **Loop-Frequenz:** Drop+Shop nach **jeder** Welle (`dropCadence: 'everyWave'`),
+  pro Level überschreibbar. → [ADR-001](decisions.md)
+- ✅ **Ball-Drops:** bei **Tod** (garantiert) **und** bei **Treffer** (Chance
+  `ballDropOnHitChance`). → [ADR-002](decisions.md)
 
-Diese sind als Config-Flags vorgesehen, nicht als Code-Verzweigungen.
+**Noch offen** (Config-Flags vorgesehen, kein Code-Branch):
+- Ziel-Strategie des Auto-Attacks (vorderster / niedrigste HP / stärkster).
+- Konkreter Startwert von `ballDropOnHitChance` (Tuning).

@@ -29,7 +29,7 @@ enum StatKey {
   // Pachinko
   StartingBalls, PegDensity, MagnetStrength, BallRestitution,
   // Ökonomie
-  BallDropBonus, GoldFind, BlueprintFind,
+  BallDropBonus, BallDropOnHitChance, GoldFind, BlueprintFind,
 }
 ```
 

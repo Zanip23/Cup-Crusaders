@@ -46,11 +46,10 @@ RUN
     └── WELLE N ─►  [BOSS-Kampf] ─► [Drop] ─► [Shop] ─► nächstes Level
 ```
 
-> **Hinweis zur Granularität:** Ob *jede* Welle eine Drop+Shop-Phase auslöst oder
-> nur Welle-Enden, ist ein **Balancing-Parameter** (`dropAfterEveryWave` vs.
-> `dropAfterLevelOnly`). Das MVP nutzt Drop+Shop nach **jeder** Welle für maximale
-> Loop-Frequenz; konfigurierbar in der Level-Definition. Siehe
-> [04 – Kampf-Phase](04-combat-phase.md).
+> **Granularität (entschieden, [ADR-001](decisions.md)):** Drop+Shop läuft nach
+> **jeder** Welle (`dropCadence: 'everyWave'`) für maximale Loop-Frequenz. Pro
+> Level via `LevelDef.dropCadence` auf `'levelEnd'` überschreibbar (z. B. für
+> Survival-Bonus-Level). Siehe [04 – Kampf-Phase](04-combat-phase.md).
 
 ### Phase 1 — Kampf (Auto-Battler)
 
