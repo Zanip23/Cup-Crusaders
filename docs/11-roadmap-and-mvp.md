@@ -65,9 +65,13 @@ dazukommt. Erst wenn der leere Loop robust läuft, füllen wir M2–M4.
 ---
 
 ## Bewusst aufgeschoben (Backlog)
-- PvP / Online-Features / Cloud-Saves.
+- Cloud-Saves (lokales localStorage genügt; kein Backend im Scope).
 - Resume-after-reload mitten im Run (zunächst nur Meta persistent).
-- Reroll/Pity im Shop, Seed-Challenges, Telemetrie-Dashboards.
+- Reroll/Pity im Shop, Telemetrie-Dashboards.
+
+> **Ausgeschlossen (kein Backlog), [ADR-004](decisions.md):** Multiplayer/PvP/Koop,
+> Online-Leaderboards, Seed-Challenges und jegliche Netzwerk-Features. Cup Crusaders
+> ist ein reines Single-Player-Spiel.
 - Erweiterte Bossmechaniken, Statuseffekte, Synergie-Sets bei Items.
 
 ---

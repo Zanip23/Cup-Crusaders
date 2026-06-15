@@ -49,6 +49,21 @@ wichtigsten Regler, um Power-Wachstum zu deckeln.
 
 ---
 
+## ADR-004 — Reines Single-Player, kein Multiplayer
+**Status:** ✅ entschieden (2026-06-15)
+**Kontext:** Soll das Spiel soziale/vernetzte Features bekommen (PvP, Koop,
+Online-Leaderboards, geteilte Seed-Challenges)?
+**Entscheidung:** **Nein.** Cup Crusaders ist und bleibt ein reines
+**Single-Player**-Spiel. Kein Multiplayer, kein PvP/Koop, keine Online-Features —
+weder im MVP noch später.
+**Begründung:** Wunsch des Designers; hält Scope, Komplexität und Infrastruktur
+klein und passt zum fairen, offline-fähigen Roguelite-Kern.
+**Konsequenzen:** Kein Backend/Server, kein Netzwerk-Code, kein Account-System
+nötig. Persistenz bleibt lokal (localStorage, siehe [09](09-game-state.md)). Der
+seedbare `Rng` dient nur Tests/Reproduzierbarkeit, nicht geteilten Challenges.
+
+---
+
 ## Vorlage für neue Einträge
 ```
 ## ADR-00X — <Titel>

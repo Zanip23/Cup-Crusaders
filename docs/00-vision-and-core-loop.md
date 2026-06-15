@@ -27,7 +27,8 @@ hinweg baut der Spieler **Meta-Progression** auf (Ausrüstung, permanente Stats)
 
 - Kein Echtzeit-Action-Game mit Bewegungssteuerung des Helden (er steht fest links).
 - Kein Pay-to-Win, keine Werbung, keine Energie-/Wartesysteme.
-- Kein PvP (zumindest nicht im MVP).
+- **Kein Multiplayer** — weder PvP noch Koop, weder im MVP noch später. Reines
+  Single-Player-Spiel ([ADR-004](decisions.md)).
 
 ---
 

@@ -121,4 +121,4 @@ interface SaveRepository {
 ## Determinismus / Rng
 - `run.seed` speist einen **seedbaren PRNG** (`core/rng/Rng.ts`).
 - Drop-Streuung und Shop-Kartenziehung nutzen diesen Rng → reproduzierbare Runs,
-  testbare Balancing-Szenarien, und (später) faire geteilte "Seed-Challenges".
+  testbare Balancing-Szenarien und reproduzierbare Bug-Reports.
