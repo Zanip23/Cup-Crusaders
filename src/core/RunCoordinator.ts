@@ -9,6 +9,8 @@ import { eventBus } from '@/core/events/EventBus';
 import { GameEvent } from '@/core/events/GameEvents';
 import type { GameStateManager } from '@/core/state/GameStateManager';
 import { Rng } from '@/core/rng/Rng';
+import { FLETCHER } from '@/content/heroes/fletcher';
+import { StatKey } from '@/core/stats/StatTypes';
 
 export const SceneKey = {
   Boot: 'Boot',
@@ -20,7 +22,7 @@ export const SceneKey = {
 // M1-Standard: Welt 1 mit 15 Wellen (14 + Boss), ADR-007.
 const DEFAULT_LEVEL = 'world_1';
 const DEFAULT_TOTAL_WAVES = 15;
-const DEFAULT_HERO_HP = 100;
+const DEFAULT_HERO_HP = FLETCHER.baseStats[StatKey.MaxHp] ?? 100;
 
 export class RunCoordinator {
   constructor(
@@ -32,8 +34,17 @@ export class RunCoordinator {
   wire(): void {
     eventBus.on(GameEvent.StartRun, () => this.startNewRun());
 
-    eventBus.on(GameEvent.CombatComplete, ({ balls }) => {
-      this.gsm.dispatch({ type: 'COMBAT_BALLS_COLLECTED', amount: balls });
+    // Bälle werden während des Kampfes laufend gesammelt (Tod + Treffer-Chance).
+    eventBus.on(GameEvent.CombatBallsCollected, ({ amount }) => {
+      this.gsm.dispatch({ type: 'COMBAT_BALLS_COLLECTED', amount });
+    });
+
+    eventBus.on(GameEvent.HeroHpChanged, ({ hp }) => {
+      this.gsm.dispatch({ type: 'SET_HERO_HP', hp });
+    });
+
+    eventBus.on(GameEvent.CombatComplete, () => {
+      // Bälle sind via CombatBallsCollected bereits im transfer-Kanal.
       this.gsm.dispatch({ type: 'COMBAT_COMPLETE' });
       this.go(SceneKey.Drop);
     });

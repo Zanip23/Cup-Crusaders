@@ -53,10 +53,15 @@ Deliverable. Lies in dieser Reihenfolge:
 
 ## Status
 
-🟢 **M1 – Projekt-Skelett & leerer Loop (in Arbeit).** Das Vite + TS + Phaser-3-Setup
-steht, der 3-Phasen-Loop ist „leer" durchklickbar und der `transfer`-Kanal
-(Kampf → Drop → Shop) trägt die Ballzahl korrekt durch alle Phasen. Gameplay-Tiefe
-(M2–M4) folgt darauf, siehe [Roadmap](docs/11-roadmap-and-mvp.md).
+🟢 **M2 – Kampf-Phase (Vertical Slice).** Auf dem leeren M1-Loop steht jetzt echtes,
+rundenbasiertes Auto-Battle (ADR-005): `StatEngine` (inkl. Caps), `EffectSystem`
+(addModifier/onHit/onKill), `CombatSystem` (testbar), `WaveSpawner` mit Skalierung,
+Held „Fletcher" + Gegner + Boss, 15-Wellen-Default, HP-Balken, Hit-Flash, Floating
+Combat Text und Ball-Drops (Tod + Treffer-Chance) mit Tween in die Cup-UI →
+`transfer.ballsFromCombat`. Drop/Shop bleiben vorerst Platzhalter (M3/M4).
+
+Davor: **M1** — Vite + TS + Phaser-3-Setup, der „leere" 3-Phasen-Loop und der
+`transfer`-Kanal (Kampf → Drop → Shop). Siehe [Roadmap](docs/11-roadmap-and-mvp.md).
 
 ---
 

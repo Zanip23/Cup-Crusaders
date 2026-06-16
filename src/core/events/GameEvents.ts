@@ -4,6 +4,7 @@
 export enum GameEvent {
   // Phasen-Abschlüsse (von Szenen gefeuert, vom RunCoordinator orchestriert)
   CombatBallsCollected = 'combat.balls.collected',
+  HeroHpChanged = 'combat.hero.hp',
   CombatComplete = 'combat.complete',
   DropComplete = 'drop.complete',
   ShopBuy = 'shop.buy',
@@ -16,6 +17,7 @@ export enum GameEvent {
 
 export interface GameEventPayloads {
   [GameEvent.CombatBallsCollected]: { amount: number };
+  [GameEvent.HeroHpChanged]: { hp: number };
   [GameEvent.CombatComplete]: { balls: number };
   [GameEvent.DropComplete]: { balls: number };
   [GameEvent.ShopBuy]: { upgradeId: string; cost: number };

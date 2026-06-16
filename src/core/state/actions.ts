@@ -7,6 +7,7 @@ export type Action =
   | { type: 'RESET_RUN' }
   // Kampf-Phase: Bälle werden gesammelt, dann abgeschlossen
   | { type: 'COMBAT_BALLS_COLLECTED'; amount: number }
+  | { type: 'SET_HERO_HP'; hp: number }
   | { type: 'COMBAT_COMPLETE' }
   // Drop-Phase: liefert die per Physik gefarmte Ballsumme
   | { type: 'DROP_COMPLETE'; balls: number }

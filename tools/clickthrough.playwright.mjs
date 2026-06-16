@@ -87,7 +87,6 @@ async function main() {
 
     await page.goto(url, { waitUntil: 'networkidle' });
     await page.waitForSelector('canvas');
-    await page.waitForTimeout(1200); // Boot (500ms) → Combat
 
     const shot = async (name) => {
       await page.screenshot({ path: `${OUT}/${name}.png` });
@@ -97,24 +96,39 @@ async function main() {
       await page.mouse.click(x, y);
       await page.waitForTimeout(650);
     };
+    // Auf eine Run-Phase warten (Kampf ist Auto-Battle ohne Klicks).
+    const waitPhase = async (phase, timeout = 90000) => {
+      await page.waitForFunction((p) => window.__cc?.getPhase() === p, phase, {
+        timeout,
+        polling: 250,
+      });
+    };
 
-    const COMBAT_WIN = [360, H - 220];
     const DROP_RELEASE = [360, H - 180];
     const SHOP_CARD = [360, Math.round(H * 0.45)];
     const SHOP_NEXT = [360, H - 150];
 
+    // Welle 1
+    await waitPhase('combat');
+    await page.waitForTimeout(1500);
     await shot('01-combat-wave1');
-    await tap(COMBAT_WIN);
+    await waitPhase('drop'); // Auto-Battle läuft durch
     await shot('02-drop-wave1');
     await tap(DROP_RELEASE);
+    await waitPhase('shop');
     await shot('03-shop-wave1');
     await tap(SHOP_CARD);
     await shot('04-shop-wave1-after-buy');
     await tap(SHOP_NEXT);
+
+    // Welle 2
+    await waitPhase('combat');
+    await page.waitForTimeout(1500);
     await shot('05-combat-wave2');
-    await tap(COMBAT_WIN);
+    await waitPhase('drop');
     await shot('06-drop-wave2');
     await tap(DROP_RELEASE);
+    await waitPhase('shop');
     await shot('07-shop-wave2');
 
     // Ergebnis VOR dem Teardown schreiben — in manchen Sandboxes wird der

@@ -1,6 +1,13 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '@/ui/layout';
+import type { GameState, RunPhase } from '@/types/state';
 import { GameStateManager } from '@/core/state/GameStateManager';
+
+declare global {
+  interface Window {
+    __cc?: { getPhase: () => RunPhase; getState: () => GameState };
+  }
+}
 import { RunCoordinator } from '@/core/RunCoordinator';
 import { provideGsm, provideCoordinator } from '@/core/registry';
 import { BootScene } from '@/scenes/BootScene';
@@ -40,6 +47,12 @@ async function bootstrap(): Promise<void> {
   const coordinator = new RunCoordinator(game, gsm);
   coordinator.wire();
   provideCoordinator(game, coordinator);
+
+  // Schlanker, read-only Debug-/E2E-Hook (Phase abfragen für Browser-Tests).
+  window.__cc = {
+    getPhase: () => gsm.getState().run.phase,
+    getState: () => gsm.getState(),
+  };
 
   // 4. Bei App-Wegblendung sofort speichern (Mobile-Tabs werden eingefroren).
   const flush = () => void gsm.flush();

@@ -3,6 +3,7 @@
 
 import type { GameState, MetaState, RunState, SettingsState } from '@/types/state';
 import { SAVE_VERSION } from '@/types/state';
+import { runRewardGold } from '@/systems/combat/rewards';
 import type { Action } from './actions';
 
 export function createInitialMeta(): MetaState {
@@ -90,6 +91,12 @@ export function reducer(state: GameState, action: Action): GameState {
         },
       };
 
+    case 'SET_HERO_HP':
+      return {
+        ...state,
+        run: { ...state.run, hero: { ...state.run.hero, currentHp: Math.max(0, action.hp) } },
+      };
+
     case 'COMBAT_COMPLETE':
       // Kampf abgeschlossen → Phase Drop. ballsFromCombat ist bereits gefüllt.
       return { ...state, run: { ...state.run, phase: 'drop' } };
@@ -134,10 +141,16 @@ export function reducer(state: GameState, action: Action): GameState {
 
     case 'PLAYER_DIED': {
       const reachedLevel = Math.max(state.meta.highestLevel, state.run.waveNumber);
+      // Wellen-Belohnung auch bei Niederlage (ADR-007).
+      const gold = runRewardGold(state.run.waveNumber, false);
       return {
         ...state,
         run: { ...state.run, phase: 'gameover' },
-        meta: { ...state.meta, highestLevel: reachedLevel },
+        meta: {
+          ...state.meta,
+          highestLevel: reachedLevel,
+          currencies: { ...state.meta.currencies, gold: state.meta.currencies.gold + gold },
+        },
       };
     }
 
