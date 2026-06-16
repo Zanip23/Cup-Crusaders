@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
 import { CENTER_X, CENTER_Y, COLORS } from '@/ui/layout';
 import { getCoordinator } from '@/core/registry';
+import { validateContent } from '@/content/validate';
 
-// Boot: lädt (in M1 keine Assets), initialisiert/lädt State (in main.ts erledigt)
-// und routet in den Loop — Resume an der gespeicherten Phase oder neuer Run.
+// Boot: lädt Assets, initialisiert/lädt State (in main.ts erledigt), validiert den
+// Content (Dev) und routet in den Loop — Resume an der gespeicherten Phase oder Menü.
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('Boot');
@@ -11,6 +12,12 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(COLORS.bgCss);
+
+    // Content-Validierung im Dev-Build (docs/10) — fehlerhafte Daten früh sichtbar.
+    if (import.meta.env.DEV) {
+      const errors = validateContent();
+      if (errors.length) console.error('[validateContent] Fehler im Content:\n- ' + errors.join('\n- '));
+    }
     this.add
       .text(CENTER_X, CENTER_Y - 40, 'CUP CRUSADERS', {
         fontFamily: 'system-ui, sans-serif',
@@ -20,7 +27,7 @@ export class BootScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     this.add
-      .text(CENTER_X, CENTER_Y + 20, 'M1 — leerer Loop', {
+      .text(CENTER_X, CENTER_Y + 20, 'Auto-Battler · Pachinko · Roguelite', {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '22px',
         color: COLORS.muted,

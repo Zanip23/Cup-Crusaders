@@ -15,6 +15,10 @@ export const DEFAULT_SCALING: ScalingProfile = {
   bossDmgMult: 2.0,
 };
 
+export const SCALING_REGISTRY: Record<string, ScalingProfile> = {
+  [DEFAULT_SCALING.id]: DEFAULT_SCALING,
+};
+
 export interface ScaledStats {
   hp: number;
   contactDamage: number;
