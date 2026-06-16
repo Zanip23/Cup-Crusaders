@@ -131,7 +131,7 @@ export function validateBoardGeometry(board: BoardDef): string[] {
     });
   }
 
-  if (board.bins.length === 0) {
+  if (!board.bins || board.bins.length === 0) {
     err('keine Bins');
   } else {
     const sortedBins = [...board.bins].sort((a, b) => a.x - b.x);

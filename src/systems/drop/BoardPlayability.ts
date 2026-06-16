@@ -111,7 +111,7 @@ function hasVerticalCorridor(
 }
 
 function multiplierForX(board: BoardDef, x: number): number | undefined {
-  return board.bins.find((bin) => x >= bin.x && x <= bin.x + bin.w)?.multiplier;
+  return board.bins?.find((bin) => x >= bin.x && x <= bin.x + bin.w)?.multiplier;
 }
 
 function estimateReachableBinIndexes(
@@ -123,7 +123,7 @@ function estimateReachableBinIndexes(
   const startY = CUP_Y + 40;
   const endY = board.height - BIN_ENTRY_Y_OFFSET;
 
-  board.bins.forEach((bin, index) => {
+  (board.bins ?? []).forEach((bin, index) => {
     const sampleCount = 5;
     for (let sample = 0; sample < sampleCount; sample++) {
       const ratio = sample / (sampleCount - 1);
@@ -174,14 +174,15 @@ export function evaluateBoardPlayability(board: BoardDef, seed: number): BoardPl
   const collectedRatio = collected / BALLS_TESTED;
   const lostRatio = 1 - collectedRatio;
   const stuckCount = BALLS_TESTED - collected;
+  const binCount = board.bins?.length ?? 0;
   const reachableBinRatio =
-    board.bins.length === 0 ? 0 : reachableBinIndexes.size / board.bins.length;
+    binCount === 0 ? 0 : reachableBinIndexes.size / binCount;
   const reasons: string[] = [];
 
-  if (board.bins.length === 0) reasons.push('Board hat keine Sammel-Bins.');
+  if (binCount === 0) reasons.push('Board hat keine Sammel-Bins.');
   if (reachableBinRatio < MIN_REACHABLE_BIN_RATIO) {
     reasons.push(
-      `Zu wenige Bins statisch erreichbar (${reachableBinIndexes.size}/${board.bins.length}).`,
+      `Zu wenige Bins statisch erreichbar (${reachableBinIndexes.size}/${binCount}).`,
     );
   }
   if (collectedRatio < MIN_COLLECTED_RATIO) {
