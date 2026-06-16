@@ -1,216 +1,104 @@
-// Basis-Board für die Drop-Phase (docs/05, docs/08 §3.6). Near-Miss-Layout:
-// zentraler x10-Bin, flankiert von kleineren — Layout/Gefühl, keine versteckte
-// Mathematik (ADR-009: reine Physik bestimmt das Ergebnis).
+// Drop-Board im „Fill-the-Cup"-Stil (Referenz): ein beweglicher Becher oben
+// schüttet Bälle aus, sie fallen durch horizontale MULTIPLIKATOR-BALKEN, die die
+// Ball-ANZAHL vervielfachen (gateMultiply spawnt Bonus-Bälle, ohne den Wert zu
+// ändern), und ein unten angesetzter TRICHTER leitet alles in den Fang-Becher.
+// ADR-009: reine Physik bestimmt das Ergebnis.
 
-import type { BoardDef, PegDef } from '@/types/content';
+import type { BoardDef, BoardBlockerDef, BoardPlatformDef, Effect } from '@/types/content';
 import { GAME_WIDTH } from '@/ui/layout';
 
-const PEG_TOP = 330;
-const PEG_ROWS = 5;
-const ROW_GAP = 92;
-const COL_GAP = 130;
+const W = GAME_WIDTH;
+const POST = 0x9a6738; // Holzpfosten-Braun
 
-function buildPegs(): PegDef[] {
-  const pegs: PegDef[] = [];
-  for (let row = 0; row < PEG_ROWS; row++) {
-    const y = PEG_TOP + row * ROW_GAP;
-    const offset = row % 2 === 0 ? 68 : 132;
-    for (let x = offset; x <= GAME_WIDTH - 40; x += COL_GAP) {
-      pegs.push({ x, y, radius: 7 });
-    }
-  }
-  return pegs;
+// Farbschema der Balken nach Wirkung (wie Referenz).
+const BAR_COLOR = {
+  mult: 0xf4c430, // amber: x2/x3 …
+  high: 0x36d66b, // grün: hohe Multiplikatoren / Bonus
+  mystery: 0x9a5cff, // lila: ???
+  boost: 0x4cc9f0, // blau: ⌃ Boost
+} as const;
+
+function mult(factor: number): Effect {
+  return { type: 'gateMultiply', params: { factor } };
+}
+function bonus(amount: number): Effect {
+  return { type: 'gateAdd', params: { amount } };
+}
+function mystery(min: number, max: number): Effect {
+  return { type: 'gateMystery', params: { min, max } };
 }
 
-const BIN_COUNT = 5;
-const BIN_W = GAME_WIDTH / BIN_COUNT;
-const BIN_MULTS = [1, 5, 10, 5, 1]; // x10 zentral (Near-Miss)
+// Ein Balken-Segment in einer Reihe.
+function bar(
+  x: number,
+  y: number,
+  w: number,
+  label: string,
+  effect: Effect,
+  color: number,
+): BoardPlatformDef {
+  return { x, y, w, h: 30, label, effect, color };
+}
+
+// Kurzer vertikaler Leitpfosten (hängt von einer Balkenreihe herab).
+function post(x: number, y: number, h = 96): BoardBlockerDef {
+  return { x, y, w: 16, h, color: POST };
+}
 
 export const BOARD_BASIC: BoardDef = {
   id: 'board_basic',
-  width: GAME_WIDTH,
+  width: W,
   height: 1280,
   gravity: 1,
-  defaultRestitution: 0.5,
-  pegs: buildPegs(),
-  bumpers: [
-    { x: GAME_WIDTH * 0.22, y: 610, radius: 24, label: 'BOUNCE', color: 0x4cc9f0 },
-    { x: GAME_WIDTH * 0.78, y: 610, radius: 24, label: 'BOUNCE', color: 0x4cc9f0 },
-  ],
-  ramps: [
-    { x: GAME_WIDTH * 0.19, y: 455, w: 170, h: 16, angle: -22, label: '↘', color: 0xd7f3ff },
-    { x: GAME_WIDTH * 0.81, y: 455, w: 170, h: 16, angle: 22, label: '↙', color: 0xd7f3ff },
-    { x: GAME_WIDTH * 0.27, y: 820, w: 150, h: 16, angle: 18, label: '↙', color: 0xd7f3ff },
-    { x: GAME_WIDTH * 0.73, y: 820, w: 150, h: 16, angle: -18, label: '↘', color: 0xd7f3ff },
-  ],
+  defaultRestitution: 0.3,
+  catcherWidth: 168,
+  pegs: [],
   platforms: [
-    {
-      x: GAME_WIDTH * 0.5,
-      y: 545,
-      w: 230,
-      h: 28,
-      label: 'x2',
-      effect: { type: 'gateMultiply', params: { factor: 2 } },
-      color: 0xf4c430,
-    },
-    {
-      x: GAME_WIDTH * 0.35,
-      y: 735,
-      w: 190,
-      h: 26,
-      label: '+5',
-      effect: { type: 'gateAdd', params: { amount: 5 } },
-      color: 0x36d66b,
-    },
-    {
-      x: GAME_WIDTH * 0.65,
-      y: 920,
-      w: 190,
-      h: 26,
-      label: 'x2',
-      effect: { type: 'gateMultiply', params: { factor: 2 } },
-      color: 0xf4c430,
-    },
+    // Reihe 1: x3 | x4
+    bar(W * 0.18, 430, 250, 'x3', mult(3), BAR_COLOR.mult),
+    bar(W * 0.68, 430, 330, 'x4', mult(4), BAR_COLOR.high),
+    // Reihe 2: ??? | x2
+    bar(W * 0.2, 620, 250, '???', mystery(2, 5), BAR_COLOR.mystery),
+    bar(W * 0.74, 620, 270, 'x2', mult(2), BAR_COLOR.mult),
+    // Reihe 3: x2 | (Boost) | x2
+    bar(W * 0.16, 820, 200, 'x2', mult(2), BAR_COLOR.mult),
+    bar(W * 0.82, 820, 200, 'x2', mult(2), BAR_COLOR.mult),
   ],
   boosters: [
-    {
-      x: GAME_WIDTH * 0.5,
-      y: 690,
-      w: 112,
-      h: 42,
-      label: 'BOOST',
-      effect: { type: 'gateAdd', params: { amount: 3 } },
-      color: 0xff4fd8,
-    },
+    { x: W * 0.5, y: 820, w: 168, h: 34, label: '▲ BOOST', effect: mult(2), color: BAR_COLOR.boost },
   ],
-  blockers: [
-    { x: GAME_WIDTH * 0.5, y: 1040, w: 14, h: 120, angle: 0, label: 'risk', color: 0xff6b6b },
-  ],
-  gates: [
-    {
-      x: GAME_WIDTH * 0.3,
-      y: 660,
-      w: 76,
-      h: 24,
-      label: 'x2',
-      effect: { type: 'gateMultiply', params: { factor: 2 } },
-    },
-    {
-      x: GAME_WIDTH * 0.7,
-      y: 660,
-      w: 76,
-      h: 24,
-      label: '+5',
-      effect: { type: 'gateAdd', params: { amount: 5 } },
-    },
-  ],
-  bins: BIN_MULTS.map((m, i) => ({
-    x: i * BIN_W,
-    w: BIN_W,
-    multiplier: m,
-    label: `x${m}`,
-  })),
-  maxConcurrentBalls: 200,
+  blockers: [post(W * 0.43, 470, 110), post(W * 0.5, 660, 90), post(W * 0.62, 660, 90), post(W * 0.36, 860, 80), post(W * 0.64, 860, 80)],
+  gates: [],
+  maxConcurrentBalls: 420,
 };
-
-// Zweites, dichteres Board (Welt 2): mehr Hindernisse, stärkere Tore (x3 / +10),
-// aggressivere Rampen und schmalere Bonus-Zonen. Höheres Chaos → höhere Varianz.
-function buildPegsDense(): PegDef[] {
-  const pegs: PegDef[] = [];
-  const rows = 7;
-  for (let row = 0; row < rows; row++) {
-    const y = 275 + row * 70;
-    const offset = row % 2 === 0 ? 46 : 98;
-    for (let x = offset; x <= GAME_WIDTH - 30; x += 112) {
-      pegs.push({ x, y, radius: 7 });
-    }
-  }
-  return pegs;
-}
 
 export const BOARD_DENSE: BoardDef = {
   id: 'board_dense',
-  width: GAME_WIDTH,
+  width: W,
   height: 1280,
   gravity: 1,
-  defaultRestitution: 0.55,
-  pegs: buildPegsDense(),
-  bumpers: [
-    { x: GAME_WIDTH * 0.18, y: 540, radius: 22, label: 'CHAOS', color: 0xff6b6b },
-    { x: GAME_WIDTH * 0.5, y: 650, radius: 28, label: 'CHAOS', color: 0xff6b6b },
-    { x: GAME_WIDTH * 0.82, y: 540, radius: 22, label: 'CHAOS', color: 0xff6b6b },
-  ],
-  ramps: [
-    { x: GAME_WIDTH * 0.2, y: 420, w: 175, h: 16, angle: -28, label: '↘', color: 0xd7f3ff },
-    { x: GAME_WIDTH * 0.8, y: 420, w: 175, h: 16, angle: 28, label: '↙', color: 0xd7f3ff },
-    { x: GAME_WIDTH * 0.29, y: 790, w: 170, h: 16, angle: 25, label: '↙', color: 0xd7f3ff },
-    { x: GAME_WIDTH * 0.71, y: 790, w: 170, h: 16, angle: -25, label: '↘', color: 0xd7f3ff },
-    { x: GAME_WIDTH * 0.5, y: 940, w: 150, h: 14, angle: 15, label: 'tilt', color: 0xd7f3ff },
-  ],
+  defaultRestitution: 0.34,
+  catcherWidth: 150,
+  pegs: [],
   platforms: [
-    {
-      x: GAME_WIDTH * 0.5,
-      y: 520,
-      w: 190,
-      h: 26,
-      label: 'x3',
-      effect: { type: 'gateMultiply', params: { factor: 3 } },
-      color: 0x36d66b,
-    },
-    {
-      x: GAME_WIDTH * 0.28,
-      y: 705,
-      w: 150,
-      h: 24,
-      label: '+10',
-      effect: { type: 'gateAdd', params: { amount: 10 } },
-      color: 0x4cc9f0,
-    },
-    {
-      x: GAME_WIDTH * 0.72,
-      y: 875,
-      w: 150,
-      h: 24,
-      label: 'x4',
-      effect: { type: 'gateMultiply', params: { factor: 4 } },
-      color: 0xf4c430,
-    },
+    // Reihe 1: Bonus | x2 | Bonus
+    bar(W * 0.16, 400, 230, 'Bonus', bonus(6), BAR_COLOR.high),
+    bar(W * 0.84, 400, 230, 'Bonus', bonus(6), BAR_COLOR.high),
+    bar(W * 0.5, 400, 180, 'x2', mult(2), BAR_COLOR.mult),
+    // Reihe 2: x4 | x3
+    bar(W * 0.42, 600, 430, 'x4', mult(4), BAR_COLOR.high),
+    bar(W * 0.9, 600, 150, 'x3', mult(3), BAR_COLOR.mult),
+    // Reihe 3: x2 | ??? | x2
+    bar(W * 0.16, 800, 200, 'x2', mult(2), BAR_COLOR.mult),
+    bar(W * 0.5, 800, 200, '???', mystery(2, 6), BAR_COLOR.mystery),
+    bar(W * 0.84, 800, 200, 'x2', mult(2), BAR_COLOR.mult),
   ],
   boosters: [
-    {
-      x: GAME_WIDTH * 0.5,
-      y: 735,
-      w: 104,
-      h: 40,
-      label: 'BOOST',
-      effect: { type: 'gateAdd', params: { amount: 5 } },
-      color: 0xff4fd8,
-    },
+    { x: W * 0.3, y: 800, w: 150, h: 32, label: '▲ BOOST', effect: mult(2), color: BAR_COLOR.boost },
   ],
-  blockers: [
-    { x: GAME_WIDTH * 0.42, y: 1010, w: 14, h: 130, angle: -10, label: 'risk', color: 0xff6b6b },
-    { x: GAME_WIDTH * 0.58, y: 1010, w: 14, h: 130, angle: 10, label: 'risk', color: 0xff6b6b },
-  ],
-  gates: [
-    {
-      x: GAME_WIDTH * 0.28,
-      y: 700,
-      w: 76,
-      h: 24,
-      label: 'x3',
-      effect: { type: 'gateMultiply', params: { factor: 3 } },
-    },
-    {
-      x: GAME_WIDTH * 0.72,
-      y: 700,
-      w: 76,
-      h: 24,
-      label: '+10',
-      effect: { type: 'gateAdd', params: { amount: 10 } },
-    },
-  ],
-  bins: BIN_MULTS.map((m, i) => ({ x: i * BIN_W, w: BIN_W, multiplier: m, label: `x${m}` })),
-  maxConcurrentBalls: 200,
+  blockers: [post(W * 0.36, 440, 100), post(W * 0.64, 440, 100), post(W * 0.78, 640, 90), post(W * 0.36, 840, 80), post(W * 0.64, 840, 80)],
+  gates: [],
+  maxConcurrentBalls: 420,
 };
 
 export const BOARD_REGISTRY: Record<string, BoardDef> = {
