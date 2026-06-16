@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#1a1a2e" />
+  <!-- Becher (Cup) -->
+  <path d="M150 150 h212 l-26 200 a40 40 0 0 1 -40 36 h-80 a40 40 0 0 1 -40 -36 z"
+        fill="#f4c430" stroke="#b8860b" stroke-width="10" />
+  <!-- Henkel -->
+  <path d="M362 180 h40 a40 40 0 0 1 0 80 h-30"
+        fill="none" stroke="#b8860b" stroke-width="20" />
+  <!-- Ball im Becher -->
+  <circle cx="256" cy="250" r="46" fill="#e94560" stroke="#fff" stroke-width="8" />
+</svg>

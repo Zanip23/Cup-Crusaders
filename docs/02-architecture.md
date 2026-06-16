@@ -64,8 +64,12 @@ Eine Phaser-Scene pro Phase + Boot + Meta-Menü.
 | `DropScene` | **Matter** | Canvas + DOM-HUD | Pachinko: Becher, Pegs, Tore, Bins |
 | `ShopScene` | – | DOM-Overlay | 3 Upgrade-Karten, Kauf/Skip |
 
-> `ShopScene` läuft als **Overlay** via `scene.launch` (parallel), nicht
-> `scene.start` — so bleibt der Kampf-Hintergrund sichtbar/eingefroren.
+> `ShopScene`/`MetaScene` sind als **DOM-Overlays** (HTML/CSS über dem Canvas)
+> umgesetzt. **Implementierungsentscheidung:** Sie werden via `scene.start`
+> (eine aktive Szene zur Zeit) geführt, nicht via paralleles `scene.launch`. Da das
+> Overlay den Bildschirm vollflächig mit Backdrop füllt, ist der eingefrorene
+> Hintergrund optisch irrelevant; das spart die Komplexität paralleler Szenen
+> (Szenen-Stacking). Echtes `scene.launch`-Overlay bleibt eine optionale Politur.
 
 ---
 

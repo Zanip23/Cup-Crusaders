@@ -46,6 +46,7 @@ Deliverable. Lies in dieser Reihenfolge:
 | 11 | [Roadmap & MVP](docs/11-roadmap-and-mvp.md) | Vertical Slice, Milestones |
 | 12 | [Content-Bibliothek](docs/12-content-library.md) | Referenz-Seed: Gegner, Bosse, Sets, Blessings, Welten |
 | 13 | [KPIs & Analytics](docs/13-kpis-and-analytics.md) | Qualitäts-/Fairness-Ziele, lokale Analytics-Events (opt-in) |
+| 14 | [Projektstand & offene Punkte](docs/14-project-status.md) | **Aktueller Implementierungsstand, alle offenen Punkte/TODOs** |
 | — | [Decision Log](docs/decisions.md) | Verbindliche Designentscheidungen (ADR-001…014) |
 | — | [Glossar](docs/glossary.md) | Einheitliche Begriffe |
 
@@ -53,5 +54,75 @@ Deliverable. Lies in dieser Reihenfolge:
 
 ## Status
 
-🟡 **Phase 0 – Planung & Dokumentation.** Noch kein Spielcode. Implementierung
-beginnt nach Freigabe des Architekturplans (siehe Roadmap, Milestone M1).
+🟢 **M1–M5 fertig · M6 in Arbeit.** Spielbarer Vertical Slice **mit Meta-Progression
+und Content-Breite**: Hauptmenü → Kampf (rundenbasiertes Auto-Battle) → Drop
+(Matter.js-Pachinko) → Shop (DOM, Upgrades wirken) → Level-Progression über **2
+Welten** mit Boss-Loot → Run-Ende → Menü. 80 Tests grün.
+
+**M6 offen:** Active Ability Deck, Audio/Haptik, Settings-UI, Lokalisierung,
+Performance-/PWA-Pass. **Vollständiger Stand & alle offenen Punkte:**
+[docs/14 – Projektstand](docs/14-project-status.md). Roadmap:
+[docs/11](docs/11-roadmap-and-mvp.md).
+
+---
+
+## Entwicklung
+
+```bash
+npm install      # Abhängigkeiten installieren
+npm run dev      # Dev-Server (Vite, HMR) → http://localhost:5173
+npm run build    # Typecheck + Production-Build nach dist/
+npm test         # Vitest (reine Logik: Reducer, Rng, Loop-Integration)
+npm run lint     # ESLint
+npm run e2e      # Playwright-E2E (echter Browser, klickt den Loop durch)
+```
+
+### E2E / visueller Smoke-Test (Playwright)
+
+`tests-e2e/loop.spec.ts` klickt den kompletten Loop im echten Browser durch
+(zwei Wellen inkl. zweitem Shop-Besuch) und sammelt Konsolenfehler als Pass/Fail
+— so wurden u. a. der Szenen-Stacking- und der ShopScene-Reset-Bug gefunden.
+
+```bash
+# Standard (lokal / CI): startet den Dev-Server selbst via webServer-Config
+CHROME_BIN=/pfad/zu/chrome npm run e2e
+```
+
+**Browser-Binary:** Playwrights eigene (gepatchte) Chromium-Builds liegen nur auf
+`cdn.playwright.dev` / `azureedge` — diese Hosts sind in der CI-/Web-Umgebung per
+Egress-Policy blockiert, `npx playwright install` schlägt dort fehl. Daher nutzen
+wir ein beliebiges Chromium via `CHROME_BIN`:
+
+- **Chrome for Testing** (von `storage.googleapis.com`, erlaubt):
+  `chrome-linux64.zip` aus `https://storage.googleapis.com/chrome-for-testing-public/<version>/linux64/`
+  entpacken und `CHROME_BIN` auf das `chrome`-Binary setzen.
+- **Fallback ohne Download-Host:** `@sparticuz/chromium` liefert einen Chromium-
+  Binary direkt im npm-Paket. Der Standalone-Runner unten nutzt ihn automatisch,
+  wenn `CHROME_BIN` nicht gesetzt ist.
+
+**Sandbox-tauglicher Standalone-Runner** (ein einzelner Node-Prozess, serviert das
+gebaute `dist/` selbst — robust, wo der Playwright-Test-Runner Worker forkt oder
+Hintergrund-Server gekillt werden):
+
+```bash
+npm run build
+npm run clickthrough          # Screenshots + result.txt → /tmp/shots-pw (OUT=… überschreibbar)
+```
+
+> Auf manchen Distributionen werden zusätzlich System-Libs (z. B. `libnss3`) benötigt.
+
+### Was in M1 steht
+
+- **Setup:** Vite, TypeScript (strict), Phaser 3, Portrait-Config (720×1280), Pixel-Art-Flags.
+- **PWA:** Web App Manifest + Service Worker (App-Shell-Cache, offline-first).
+- **`core/`:** `GameStateManager` (Scopes/Reducer/Actions/Selectors), typisierter
+  `EventBus`, `SaveRepository` (IndexedDB, async, mit Migrations-Gerüst), seedbarer `Rng`.
+- **`RunCoordinator`:** verdrahtet die Phasenübergänge event-getrieben (Szenen kennen
+  die nächste Szene nicht).
+- **Szenen:** `Boot → Combat → Drop → Shop → Combat` als Loop mit Platzhalter-UI.
+- **Resume after reload:** Der laufende Run wird (debounced) persistiert und beim
+  Neustart an der korrekten Phase fortgesetzt.
+- **Tests:** transfer-Vertrag (Reducer) und Rng-Determinismus.
+
+> Ordnerstruktur und Verträge folgen [docs/02 – Architektur](docs/02-architecture.md)
+> und [docs/09 – Game State](docs/09-game-state.md).
