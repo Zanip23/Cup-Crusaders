@@ -3,6 +3,9 @@
 
 import type { StatKey, Modifier } from '@/core/stats/StatTypes';
 
+/** Raritäten (5 Stufen, Common→Mythic, ADR-013). */
+export type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+
 export type EffectType =
   | 'addModifier'
   | 'grantAbility'

@@ -104,9 +104,11 @@ async function main() {
       });
     };
 
-    const DROP_RELEASE = [360, H - 90]; // „Ausschütten"-Button
-    const SHOP_CARD = [360, Math.round(H * 0.45)];
-    const SHOP_NEXT = [360, H - 150];
+    const DROP_RELEASE = [360, H - 90]; // „Ausschütten"-Button (Canvas)
+    // Shop ist ein DOM-Overlay → Klick per data-testid (robuster als Koordinaten).
+    const buyAll = async () => {
+      for (let i = 0; i < 3; i++) await page.click(`[data-testid="shop-card-${i}"]`).catch(() => {});
+    };
 
     // Welle 1
     await waitPhase('combat');
@@ -117,9 +119,9 @@ async function main() {
     await tap(DROP_RELEASE);
     await waitPhase('shop');
     await shot('03-shop-wave1');
-    await tap(SHOP_CARD);
+    await buyAll();
     await shot('04-shop-wave1-after-buy');
-    await tap(SHOP_NEXT);
+    await page.click('[data-testid="shop-next"]');
 
     // Welle 2
     await waitPhase('combat');

@@ -5,13 +5,18 @@ import { test, expect, type Page } from '@playwright/test';
 // werden über den read-only Debug-Hook window.__cc abgewartet, nicht geklickt.
 
 const H = 1280;
-const DROP_RELEASE = { x: 360, y: H - 90 }; // „Ausschütten"-Button
-const SHOP_CARD = { x: 360, y: Math.round(H * 0.45) };
-const SHOP_NEXT = { x: 360, y: H - 150 };
+const DROP_RELEASE = { x: 360, y: H - 90 }; // „Ausschütten"-Button (Canvas)
 
 async function tap(page: Page, p: { x: number; y: number }) {
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(650);
+}
+
+async function buyAll(page: Page) {
+  // Shop ist ein DOM-Overlay → Klick per data-testid (unbezahlbar = no-op).
+  for (let i = 0; i < 3; i++) {
+    await page.click(`[data-testid="shop-card-${i}"]`).catch(() => undefined);
+  }
 }
 
 async function waitPhase(page: Page, phase: string, timeout = 90_000) {
@@ -41,9 +46,9 @@ test('zwei Wellen Auto-Battle → Drop → Shop, ohne Browser-Fehler', async ({ 
   await tap(page, DROP_RELEASE);
   await waitPhase(page, 'shop');
   await shot('03-shop-wave1');
-  await tap(page, SHOP_CARD);
+  await buyAll(page);
   await shot('04-shop-wave1-after-buy');
-  await tap(page, SHOP_NEXT);
+  await page.click('[data-testid="shop-next"]');
 
   await waitPhase(page, 'combat');
   await page.waitForTimeout(1500);

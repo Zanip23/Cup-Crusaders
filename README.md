@@ -53,16 +53,16 @@ Deliverable. Lies in dieser Reihenfolge:
 
 ## Status
 
-🟢 **M3 – Drop-Phase (Vertical Slice).** Echte **Matter.js-Pachinko-Physik**
-(ADR-009, physik-autoritativ): Becher (Drag **+** Tap/Buttons als WCAG-Alternative),
-gestaffeltes Peg-Feld, Tore (x2 / +5) und Bins (x1/x5/x10/x5/x1) mit zentralem
-Near-Miss-x10. Bälle sind **Value-Carrying Bodies**; der `DropResolver` summiert nur
-die tatsächlichen Ergebnisse → `transfer.ballsFromDrop` → Shop-Währung. Mit
-Performance-Cap, gestreutem Tropfen und Timeout-Sicherung.
+🟢 **M4 – Shop-Phase & Vertical Slice komplett.** Der Shop ist ein **DOM-Overlay**
+(docs/06): 3 gewichtete Karten aus einem seedbaren Pool, Kosten-Skalierung pro Welle,
+mehrere Käufe pro Shop (ADR-003). Gekaufte Upgrades fließen über die **StatEngine**
+in den Helden (`buildHeroStats`) und wirken **nachweisbar ab der nächsten Welle**
+(z. B. Mehrfachschuss → mehr Angriffe, Extra-Munition → mehr Drop-Bälle). Damit
+läuft der **vollständige Vertical Slice**: Kampf → Drop → Shop mit echtem Gameplay,
+steigender Schwierigkeit (Gegner- + Kosten-Skalierung) und Run-Ende.
 
-Davor: **M2** rundenbasiertes Auto-Battle (StatEngine/EffectSystem/CombatSystem,
-Held/Gegner/Boss, Ball-Drops) und **M1** (leerer Loop + `transfer`-Kanal). Shop ist
-noch Platzhalter (M4). Siehe [Roadmap](docs/11-roadmap-and-mvp.md).
+Davor: **M3** Matter.js-Pachinko-Drop, **M2** rundenbasiertes Auto-Battle, **M1**
+leerer Loop + `transfer`-Kanal. Siehe [Roadmap](docs/11-roadmap-and-mvp.md).
 
 ---
 

@@ -5,11 +5,11 @@ import { getGsm } from '@/core/registry';
 import { eventBus } from '@/core/events/EventBus';
 import { GameEvent } from '@/core/events/GameEvents';
 import { selectBallsFromCombat } from '@/core/state/selectors';
-import { StatEngine } from '@/core/stats/StatEngine';
 import { StatKey } from '@/core/stats/StatTypes';
 import { EffectSystem } from '@/core/effects/EffectSystem';
 import { Rng } from '@/core/rng/Rng';
 import { CombatSystem } from '@/systems/combat/CombatSystem';
+import { buildHeroStats } from '@/systems/combat/heroBuild';
 import { buildWave, isBossWave } from '@/systems/WaveSpawner';
 import { WORLD_1 } from '@/content/waves/world-1';
 import { FLETCHER } from '@/content/heroes/fletcher';
@@ -56,9 +56,8 @@ export class CombatScene extends Phaser.Scene {
 
     new TopBar(this, 'KAMPF (Auto-Battler)', (g) => `🏐 ${selectBallsFromCombat(g.getState())}`);
 
-    // Held-StatEngine aus den Basis-Stats (Run-Upgrade-Modifier folgen in M4).
-    const hero = new StatEngine();
-    hero.setBase(FLETCHER.baseStats);
+    // Held-StatEngine aus Basis-Stats + gekauften Run-Upgrades (wirken ab jetzt).
+    const hero = buildHeroStats(gsm.getState().run.upgrades);
     this.heroMaxHp = hero.get(StatKey.MaxHp);
 
     const enemies = buildWave(WORLD_1, waveNumber);

@@ -8,6 +8,8 @@ import { GameEvent } from '@/core/events/GameEvents';
 import { selectBallsFromCombat } from '@/core/state/selectors';
 import { BOARD_BASIC } from '@/content/boards/basic';
 import { applyGateEffect, DropResolver } from '@/systems/drop/DropResolver';
+import { buildHeroStats } from '@/systems/combat/heroBuild';
+import { StatKey } from '@/core/stats/StatTypes';
 import type { BoardDef } from '@/types/content';
 
 // Drop-Phase mit echter Matter.js-Physik (ADR-009, docs/05). Physik-autoritativ:
@@ -45,7 +47,9 @@ export class DropScene extends Phaser.Scene {
 
     const gsm = getGsm(this);
     this.board = BOARD_BASIC;
-    this.ammo = selectBallsFromCombat(gsm.getState());
+    // Munition = Kampf-Bälle + StartingBalls-Upgrade (additiv vor Drop-Start, docs/05).
+    const startingBalls = buildHeroStats(gsm.getState().run.upgrades).get(StatKey.StartingBalls);
+    this.ammo = selectBallsFromCombat(gsm.getState()) + Math.round(startingBalls);
     this.resolver = new DropResolver();
 
     new TopBar(this, 'DROP (Pachinko)', () => `🏐 ${this.ammo}`);
