@@ -64,7 +64,9 @@ export const BOARD_BASIC: BoardDef = {
     bar(W * 0.16, 820, 200, 'x2', mult(2), BAR_COLOR.mult),
     bar(W * 0.82, 820, 200, 'x2', mult(2), BAR_COLOR.mult),
   ],
-  boosters: [{ x: W * 0.5, y: 820, w: 150, h: 34, label: '⌃', effect: mult(2), color: BAR_COLOR.boost }],
+  boosters: [
+    { x: W * 0.5, y: 820, w: 168, h: 34, label: '▲ BOOST', effect: mult(2), color: BAR_COLOR.boost },
+  ],
   blockers: [post(W * 0.43, 470, 110), post(W * 0.5, 660, 90), post(W * 0.62, 660, 90), post(W * 0.36, 860, 80), post(W * 0.64, 860, 80)],
   gates: [],
   maxConcurrentBalls: 420,
@@ -91,7 +93,9 @@ export const BOARD_DENSE: BoardDef = {
     bar(W * 0.5, 800, 200, '???', mystery(2, 6), BAR_COLOR.mystery),
     bar(W * 0.84, 800, 200, 'x2', mult(2), BAR_COLOR.mult),
   ],
-  boosters: [{ x: W * 0.3, y: 800, w: 130, h: 32, label: '⌃', effect: mult(2), color: BAR_COLOR.boost }],
+  boosters: [
+    { x: W * 0.3, y: 800, w: 150, h: 32, label: '▲ BOOST', effect: mult(2), color: BAR_COLOR.boost },
+  ],
   blockers: [post(W * 0.36, 440, 100), post(W * 0.64, 440, 100), post(W * 0.78, 640, 90), post(W * 0.36, 840, 80), post(W * 0.64, 840, 80)],
   gates: [],
   maxConcurrentBalls: 420,
