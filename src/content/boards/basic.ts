@@ -1,177 +1,100 @@
-// Drop-Board im „Fill-the-Cup"-Stil (Referenz): ein fester Spender oben schüttet
-// Bälle aus, sie fallen durch horizontale MULTIPLIKATOR-BALKEN (vervielfachen die
-// Ball-ANZAHL) und werden unten in einem BEWEGLICHEN Fang-Becher aufgefangen
-// (ADR-009: reine Physik bestimmt das Ergebnis — Treffer im Catcher = +1).
+// Drop-Board im „Fill-the-Cup"-Stil (Referenz): ein beweglicher Becher oben
+// schüttet Bälle aus, sie fallen durch horizontale MULTIPLIKATOR-BALKEN, die die
+// Ball-ANZAHL vervielfachen (gateMultiply spawnt Bonus-Bälle, ohne den Wert zu
+// ändern), und ein unten angesetzter TRICHTER leitet alles in den Fang-Becher.
+// ADR-009: reine Physik bestimmt das Ergebnis.
 
-import type { BoardDef, PegDef } from '@/types/content';
+import type { BoardDef, BoardBlockerDef, BoardPlatformDef, Effect } from '@/types/content';
 import { GAME_WIDTH } from '@/ui/layout';
 
-// Wenige, gezielt platzierte Pins als sanfte Ablenker (kein dichtes Pachinko-Feld).
-function sparsePegs(rows: { y: number; xs: number[] }[]): PegDef[] {
-  return rows.flatMap((row) => row.xs.map((x) => ({ x, y: row.y, radius: 8 })));
+const W = GAME_WIDTH;
+const POST = 0x9a6738; // Holzpfosten-Braun
+
+// Farbschema der Balken nach Wirkung (wie Referenz).
+const BAR_COLOR = {
+  mult: 0xf4c430, // amber: x2/x3 …
+  high: 0x36d66b, // grün: hohe Multiplikatoren / Bonus
+  mystery: 0x9a5cff, // lila: ???
+  boost: 0x4cc9f0, // blau: ⌃ Boost
+} as const;
+
+function mult(factor: number): Effect {
+  return { type: 'gateMultiply', params: { factor } };
+}
+function bonus(amount: number): Effect {
+  return { type: 'gateAdd', params: { amount } };
+}
+function mystery(min: number, max: number): Effect {
+  return { type: 'gateMystery', params: { min, max } };
+}
+
+// Ein Balken-Segment in einer Reihe.
+function bar(
+  x: number,
+  y: number,
+  w: number,
+  label: string,
+  effect: Effect,
+  color: number,
+): BoardPlatformDef {
+  return { x, y, w, h: 30, label, effect, color };
+}
+
+// Kurzer vertikaler Leitpfosten (hängt von einer Balkenreihe herab).
+function post(x: number, y: number, h = 96): BoardBlockerDef {
+  return { x, y, w: 16, h, color: POST };
 }
 
 export const BOARD_BASIC: BoardDef = {
   id: 'board_basic',
-  width: GAME_WIDTH,
+  width: W,
+  height: 1280,
+  gravity: 1,
+  defaultRestitution: 0.38,
+  catcherWidth: 168,
+  pegs: [],
+  platforms: [
+    // Reihe 1: x3 | x4
+    bar(W * 0.18, 430, 250, 'x3', mult(3), BAR_COLOR.mult),
+    bar(W * 0.68, 430, 330, 'x4', mult(4), BAR_COLOR.high),
+    // Reihe 2: ??? | x2
+    bar(W * 0.2, 620, 250, '???', mystery(2, 5), BAR_COLOR.mystery),
+    bar(W * 0.74, 620, 270, 'x2', mult(2), BAR_COLOR.mult),
+    // Reihe 3: x2 | (Boost) | x2
+    bar(W * 0.16, 820, 200, 'x2', mult(2), BAR_COLOR.mult),
+    bar(W * 0.82, 820, 200, 'x2', mult(2), BAR_COLOR.mult),
+  ],
+  boosters: [{ x: W * 0.5, y: 820, w: 150, h: 34, label: '⌃', effect: mult(2), color: BAR_COLOR.boost }],
+  blockers: [post(W * 0.43, 470, 110), post(W * 0.5, 660, 90), post(W * 0.62, 660, 90), post(W * 0.36, 860, 80), post(W * 0.64, 860, 80)],
+  gates: [],
+  maxConcurrentBalls: 420,
+};
+
+export const BOARD_DENSE: BoardDef = {
+  id: 'board_dense',
+  width: W,
   height: 1280,
   gravity: 1,
   defaultRestitution: 0.42,
   catcherWidth: 150,
-  pegs: sparsePegs([
-    { y: 360, xs: [GAME_WIDTH * 0.5] },
-    { y: 560, xs: [GAME_WIDTH * 0.32, GAME_WIDTH * 0.68] },
-    { y: 770, xs: [GAME_WIDTH * 0.5] },
-  ]),
-  // Horizontale Multiplikator-Balken — jeder vervielfacht die Ball-Anzahl.
+  pegs: [],
   platforms: [
-    {
-      x: GAME_WIDTH * 0.2,
-      y: 440,
-      w: 230,
-      h: 30,
-      label: 'x3',
-      effect: { type: 'gateMultiply', params: { factor: 3 } },
-      color: 0xf4c430,
-    },
-    {
-      x: GAME_WIDTH * 0.68,
-      y: 440,
-      w: 320,
-      h: 30,
-      label: 'x4',
-      effect: { type: 'gateMultiply', params: { factor: 4 } },
-      color: 0x36d66b,
-    },
-    {
-      x: GAME_WIDTH * 0.66,
-      y: 650,
-      w: 300,
-      h: 28,
-      label: 'x2',
-      effect: { type: 'gateMultiply', params: { factor: 2 } },
-      color: 0xf4c430,
-    },
-    {
-      x: GAME_WIDTH * 0.24,
-      y: 860,
-      w: 250,
-      h: 28,
-      label: 'x2',
-      effect: { type: 'gateMultiply', params: { factor: 2 } },
-      color: 0xf4c430,
-    },
-    {
-      x: GAME_WIDTH * 0.8,
-      y: 860,
-      w: 220,
-      h: 28,
-      label: 'x2',
-      effect: { type: 'gateMultiply', params: { factor: 2 } },
-      color: 0xf4c430,
-    },
+    // Reihe 1: Bonus | x2 | Bonus
+    bar(W * 0.16, 400, 230, 'Bonus', bonus(6), BAR_COLOR.high),
+    bar(W * 0.84, 400, 230, 'Bonus', bonus(6), BAR_COLOR.high),
+    bar(W * 0.5, 400, 180, 'x2', mult(2), BAR_COLOR.mult),
+    // Reihe 2: x4 | x3
+    bar(W * 0.42, 600, 430, 'x4', mult(4), BAR_COLOR.high),
+    bar(W * 0.9, 600, 150, 'x3', mult(3), BAR_COLOR.mult),
+    // Reihe 3: x2 | ??? | x2
+    bar(W * 0.16, 800, 200, 'x2', mult(2), BAR_COLOR.mult),
+    bar(W * 0.5, 800, 200, '???', mystery(2, 6), BAR_COLOR.mystery),
+    bar(W * 0.84, 800, 200, 'x2', mult(2), BAR_COLOR.mult),
   ],
-  // Mittlerer Booster: schiebt Bälle wieder hoch (zweite Chance auf die Balken).
-  boosters: [
-    {
-      x: GAME_WIDTH * 0.5,
-      y: 850,
-      w: 130,
-      h: 34,
-      label: '⌃',
-      effect: { type: 'gateMultiply', params: { factor: 2 } },
-      color: 0x4cc9f0,
-    },
-  ],
-  // Kurze vertikale Pfosten als Leitplanken neben den Balken.
-  blockers: [
-    { x: GAME_WIDTH * 0.5, y: 660, w: 14, h: 90, angle: 0, color: 0xb8860b },
-    { x: GAME_WIDTH * 0.62, y: 870, w: 14, h: 70, angle: 0, color: 0xb8860b },
-    { x: GAME_WIDTH * 0.38, y: 870, w: 14, h: 70, angle: 0, color: 0xb8860b },
-  ],
+  boosters: [{ x: W * 0.3, y: 800, w: 130, h: 32, label: '⌃', effect: mult(2), color: BAR_COLOR.boost }],
+  blockers: [post(W * 0.36, 440, 100), post(W * 0.64, 440, 100), post(W * 0.78, 640, 90), post(W * 0.36, 840, 80), post(W * 0.64, 840, 80)],
   gates: [],
-  maxConcurrentBalls: 220,
-};
-
-// Zweites Board (Welt 2): mehr Balken, höhere Multiplikatoren, engere Lücken.
-export const BOARD_DENSE: BoardDef = {
-  id: 'board_dense',
-  width: GAME_WIDTH,
-  height: 1280,
-  gravity: 1,
-  defaultRestitution: 0.46,
-  catcherWidth: 132,
-  pegs: sparsePegs([
-    { y: 340, xs: [GAME_WIDTH * 0.36, GAME_WIDTH * 0.64] },
-    { y: 540, xs: [GAME_WIDTH * 0.5] },
-    { y: 720, xs: [GAME_WIDTH * 0.28, GAME_WIDTH * 0.72] },
-    { y: 900, xs: [GAME_WIDTH * 0.5] },
-  ]),
-  platforms: [
-    {
-      x: GAME_WIDTH * 0.22,
-      y: 420,
-      w: 220,
-      h: 28,
-      label: 'x4',
-      effect: { type: 'gateMultiply', params: { factor: 4 } },
-      color: 0x36d66b,
-    },
-    {
-      x: GAME_WIDTH * 0.72,
-      y: 420,
-      w: 280,
-      h: 28,
-      label: 'x3',
-      effect: { type: 'gateMultiply', params: { factor: 3 } },
-      color: 0xf4c430,
-    },
-    {
-      x: GAME_WIDTH * 0.3,
-      y: 620,
-      w: 260,
-      h: 26,
-      label: 'x3',
-      effect: { type: 'gateMultiply', params: { factor: 3 } },
-      color: 0xf4c430,
-    },
-    {
-      x: GAME_WIDTH * 0.78,
-      y: 760,
-      w: 240,
-      h: 26,
-      label: 'x2',
-      effect: { type: 'gateMultiply', params: { factor: 2 } },
-      color: 0xf4c430,
-    },
-    {
-      x: GAME_WIDTH * 0.26,
-      y: 900,
-      w: 240,
-      h: 26,
-      label: 'x2',
-      effect: { type: 'gateMultiply', params: { factor: 2 } },
-      color: 0xf4c430,
-    },
-  ],
-  boosters: [
-    {
-      x: GAME_WIDTH * 0.6,
-      y: 900,
-      w: 120,
-      h: 32,
-      label: '⌃',
-      effect: { type: 'gateMultiply', params: { factor: 2 } },
-      color: 0x4cc9f0,
-    },
-  ],
-  blockers: [
-    { x: GAME_WIDTH * 0.5, y: 540, w: 14, h: 90, angle: 0, color: 0xb8860b },
-    { x: GAME_WIDTH * 0.44, y: 780, w: 14, h: 80, angle: -8, color: 0xb8860b },
-    { x: GAME_WIDTH * 0.56, y: 780, w: 14, h: 80, angle: 8, color: 0xb8860b },
-  ],
-  gates: [],
-  maxConcurrentBalls: 220,
+  maxConcurrentBalls: 420,
 };
 
 export const BOARD_REGISTRY: Record<string, BoardDef> = {

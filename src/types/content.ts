@@ -51,6 +51,7 @@ export type EffectType =
   | 'onWaveStart'
   | 'gateMultiply'
   | 'gateAdd'
+  | 'gateMystery'
   | 'binCollect';
 
 export interface Effect {

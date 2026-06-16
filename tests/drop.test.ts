@@ -43,8 +43,9 @@ describe('BOARD_BASIC — Catcher-Layout (Fill-the-Cup)', () => {
   it('hat horizontale Multiplikator-Balken und eine Catcher-Breite', () => {
     const bars = BOARD_BASIC.platforms ?? [];
     expect(bars.length).toBeGreaterThan(0);
-    // Alle Balken vervielfachen die Ball-ANZAHL (gateMultiply).
-    expect(bars.every((p) => p.effect.type === 'gateMultiply')).toBe(true);
+    // Balken wirken nur über zählbare Drop-Effekte (Anzahl-Vervielfachung etc.).
+    const dropEffects = new Set(['gateMultiply', 'gateAdd', 'gateMystery']);
+    expect(bars.every((p) => dropEffects.has(p.effect.type))).toBe(true);
     expect(BOARD_BASIC.catcherWidth).toBeGreaterThan(0);
   });
 });
