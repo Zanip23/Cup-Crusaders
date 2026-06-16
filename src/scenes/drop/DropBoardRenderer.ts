@@ -213,45 +213,53 @@ export function renderBinSlot(
     .setDepth(9);
 }
 
-export function renderCup(scene: Phaser.Scene, x: number, y: number, ammo: number): CupVisuals {
+// Fester Fang-Becher unten: breiter, mit Akzent-Rand — fängt die Bälle auf.
+export function renderCatcher(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  mouthWidth: number,
+): CupVisuals {
+  const visuals = renderCup(scene, x, y, 0, 1, mouthWidth);
+  const glow = scene.add.ellipse(0, -20, mouthWidth + 18, 30, DROP_COLORS.glow, 0.32);
+  visuals.cup.addAt(glow, 1);
+  visuals.cup.setDepth(22);
+  return visuals;
+}
+
+export function renderCup(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  ammo: number,
+  scale = 1,
+  mouthWidth = 112,
+): CupVisuals {
+  const halfTop = mouthWidth / 2;
+  const halfBottom = halfTop * 0.72;
+  const bodyPts = (dx: number, dy: number): Phaser.Geom.Point[] => [
+    new Phaser.Geom.Point(-halfTop + dx, -18 + dy),
+    new Phaser.Geom.Point(halfTop + dx, -18 + dy),
+    new Phaser.Geom.Point(halfBottom + dx, 30 + dy),
+    new Phaser.Geom.Point(-halfBottom + dx, 30 + dy),
+  ];
+
   const shadow = scene.add.graphics();
   shadow.fillStyle(0x000000, 0.35);
-  shadow.fillPoints(
-    [
-      new Phaser.Geom.Point(-58, -17),
-      new Phaser.Geom.Point(58, -17),
-      new Phaser.Geom.Point(43, 31),
-      new Phaser.Geom.Point(-43, 31),
-    ],
-    true,
-  );
+  shadow.fillPoints(bodyPts(2, 1), true);
   shadow.setPosition(7, 9);
 
   const body = scene.add.graphics();
   body.fillGradientStyle(COLORS.accent, COLORS.accent, 0x8f2038, 0x8f2038, 1);
-  body.fillPoints(
-    [
-      new Phaser.Geom.Point(-56, -18),
-      new Phaser.Geom.Point(56, -18),
-      new Phaser.Geom.Point(40, 30),
-      new Phaser.Geom.Point(-40, 30),
-    ],
-    true,
-  );
+  body.fillPoints(bodyPts(0, 0), true);
   body.lineStyle(5, 0xffffff, 0.95);
-  body.strokePoints(
-    [
-      new Phaser.Geom.Point(-56, -18),
-      new Phaser.Geom.Point(56, -18),
-      new Phaser.Geom.Point(40, 30),
-      new Phaser.Geom.Point(-40, 30),
-    ],
-    true,
-  );
+  body.strokePoints(bodyPts(0, 0), true);
 
-  const rim = scene.add.ellipse(0, -20, 124, 24, 0xffffff, 0.96).setStrokeStyle(3, 0xd7f3ff, 0.95);
-  const innerRim = scene.add.ellipse(0, -20, 100, 12, 0x6d1b31, 0.34);
-  const shine = scene.add.rectangle(-24, -1, 13, 35, 0xffffff, 0.22).setRotation(0.16);
+  const rim = scene.add
+    .ellipse(0, -20, mouthWidth + 8, 24, 0xffffff, 0.96)
+    .setStrokeStyle(3, 0xd7f3ff, 0.95);
+  const innerRim = scene.add.ellipse(0, -20, mouthWidth - 12, 12, 0x6d1b31, 0.34);
+  const shine = scene.add.rectangle(-halfTop * 0.42, -1, 13, 35, 0xffffff, 0.22).setRotation(0.16);
   const ammoText = scene.add
     .text(0, 7, `${ammo}`, {
       fontSize: '30px',
@@ -263,7 +271,8 @@ export function renderCup(scene: Phaser.Scene, x: number, y: number, ammo: numbe
     .setOrigin(0.5);
   const cup = scene.add
     .container(x, y, [shadow, body, rim, innerRim, shine, ammoText])
-    .setDepth(20);
-  cup.setSize(124, 64);
+    .setDepth(20)
+    .setScale(scale);
+  cup.setSize(mouthWidth + 12, 64);
   return { cup, ammoText };
 }

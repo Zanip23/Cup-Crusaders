@@ -51,6 +51,7 @@ export type EffectType =
   | 'onWaveStart'
   | 'gateMultiply'
   | 'gateAdd'
+  | 'gateMystery'
   | 'binCollect';
 
 export interface Effect {
@@ -209,7 +210,10 @@ export interface BoardDef {
   defaultRestitution: number; // Bounce
   pegs: PegDef[];
   gates: GateDef[];
-  bins: BinDef[];
+  /** Catcher-Becher-Breite (Fang-Mund) in px. Default in der Szene, falls leer. */
+  catcherWidth?: number;
+  /** @deprecated Alte feste Bins (vor dem beweglichen Catcher). Optional, ungenutzt. */
+  bins?: BinDef[];
   bumpers?: BoardBumperDef[];
   ramps?: BoardRampDef[];
   platforms?: BoardPlatformDef[];

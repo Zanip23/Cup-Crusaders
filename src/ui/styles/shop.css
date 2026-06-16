@@ -6,9 +6,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  gap: 14px;
   box-sizing: border-box;
-  padding: calc(env(safe-area-inset-top) + 24px) 16px calc(env(safe-area-inset-bottom) + 24px);
+  padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
   background: rgba(10, 10, 24, 0.82);
   font-family: system-ui, -apple-system, sans-serif;
   color: #e6e6f0;
@@ -16,24 +16,31 @@
   user-select: none;
 }
 .cc-shop__header {
+  flex: 0 0 auto;
   font-size: 1.6rem;
   font-weight: 700;
   color: #f4c430;
   text-align: center;
 }
+/* Karten-Bereich nimmt den Platz zwischen Header und Button ein und scrollt,
+   damit der „Nächste Welle"-Button auf hohen/schmalen Handys IMMER sichtbar bleibt. */
 .cc-shop__cards {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
   justify-content: center;
+  align-content: center;
   align-items: stretch;
   width: 100%;
   max-width: 640px;
 }
 .cc-card {
-  flex: 1 1 170px;
+  flex: 1 1 150px;
   max-width: 200px;
-  min-height: 240px;
+  min-height: 200px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -80,6 +87,7 @@
   cursor: not-allowed;
 }
 .cc-shop__next {
+  flex: 0 0 auto;
   min-width: 280px;
   min-height: 56px;
   padding: 14px 28px;

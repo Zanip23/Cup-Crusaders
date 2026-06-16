@@ -65,11 +65,14 @@ export function validateContent(): string[] {
     if (e.ballDrop < 0) err(`Gegner '${e.id}': ballDrop < 0`);
   }
 
-  // 4. Boards.
+  // 4. Boards. Catcher-Layout: Multiplikator-Balken (gates/platforms) + beweglicher
+  // Fang-Becher (catcherWidth). Bins sind veraltet/optional.
   for (const b of Object.values(BOARD_REGISTRY)) {
-    if (b.bins.length === 0) err(`Board '${b.id}': keine Bins`);
     if (b.maxConcurrentBalls <= 0) err(`Board '${b.id}': maxConcurrentBalls <= 0`);
-    for (const bin of b.bins) if (bin.multiplier < 0) err(`Board '${b.id}': Bin-Multiplikator < 0`);
+    if (b.gates.length === 0 && (b.platforms?.length ?? 0) === 0)
+      err(`Board '${b.id}': keine Multiplikator-Balken (gates/platforms)`);
+    if (b.catcherWidth !== undefined && b.catcherWidth <= 0)
+      err(`Board '${b.id}': catcherWidth <= 0`);
   }
 
   // 5. Upgrades: Enum/Sanity/Referenzen.
