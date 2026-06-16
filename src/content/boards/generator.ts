@@ -356,9 +356,25 @@ function zoneAwarePoint(
   };
 }
 
-export function pickTemplate(rng: Rng, difficulty: number, wave: number): BoardTemplateId {
+export interface BoardGenerationOptions {
+  allowedTemplates?: readonly BoardTemplateId[];
+  allowMystery?: boolean;
+  allowBoosters?: boolean;
+  budgetBonus?: number;
+  idSuffix?: string;
+}
+
+export function pickTemplate(
+  rng: Rng,
+  difficulty: number,
+  wave: number,
+  allowedTemplates?: readonly BoardTemplateId[],
+): BoardTemplateId {
   const challenge = scaledDifficulty(difficulty, wave);
-  return rng.weightedPick(BOARD_TEMPLATES, (template) => {
+  const templates = allowedTemplates?.length
+    ? BOARD_TEMPLATES.filter((template) => allowedTemplates.includes(template.id))
+    : BOARD_TEMPLATES;
+  return rng.weightedPick(templates, (template) => {
     const waveCycleBonus = (wave + template.id.length) % BOARD_TEMPLATES.length === 0 ? 2 : 0;
     const riskWeight =
       template.riskRewardProfile === 'safe'
@@ -475,6 +491,7 @@ function buildPatternObjects(
   rng: Rng,
   challenge: number,
   budgetLimit: number,
+  options: BoardGenerationOptions = {},
 ) {
   const budget = { remaining: budgetLimit + template.blockerSlots.length * BLOCKER_RISK_CREDIT };
   const blockerCount = template.blockerSlots.length;
@@ -487,7 +504,8 @@ function buildPatternObjects(
     const value = effectValue(slot.kind, challenge, rng, riskScore);
     if (!spendBudget(budget, gateCost(slot.kind, value))) continue;
     const prefix = slot.kind === 'multiply' ? 'x' : '+';
-    const useMystery = challenge >= 4 && riskScore >= 4.5 && rng.next() < 0.28;
+    const useMystery =
+      options.allowMystery !== false && challenge >= 4 && riskScore >= 4.5 && rng.next() < 0.28;
     gates.push({
       ...zoneAwarePoint(slot, template.gateZones, rng, 18, 18),
       w: 76,
@@ -511,7 +529,8 @@ function buildPatternObjects(
     const value = effectValue(slot.labelKind, challenge, rng, riskScore);
     if (!spendBudget(budget, platformCost(slot.labelKind, value, slot.w))) continue;
     const prefix = slot.labelKind === 'multiply' ? 'x' : '+';
-    const useMystery = challenge >= 5 && riskScore >= 4 && rng.next() < 0.22;
+    const useMystery =
+      options.allowMystery !== false && challenge >= 5 && riskScore >= 4 && rng.next() < 0.22;
     platforms.push({
       x: Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 20)),
       y: clamp(slot.y + jitter(rng, 16), SAFE_TOP_Y, SAFE_BOTTOM_Y),
@@ -535,7 +554,7 @@ function buildPatternObjects(
   }));
 
   const boosters: BoardBoosterDef[] = [];
-  for (const slot of template.boosterSlots) {
+  for (const slot of options.allowBoosters === false ? [] : template.boosterSlots) {
     if (!spendBudget(budget, BOOSTER_COST)) continue;
     boosters.push({
       ...zoneAwarePoint(slot, template.boosterPositions, rng, 16, 16),
@@ -610,18 +629,19 @@ function buildGeneratedBoard(
   difficulty: number,
   wave: number,
   chapter: number,
+  options: BoardGenerationOptions = {},
 ): BoardDef {
   const rng = new Rng(
     (seed ^ Math.imul(difficulty, 0x45d9f3b) ^ Math.imul(wave, 0x119de1f3)) >>> 0,
   );
   const challenge = scaledDifficulty(difficulty, wave);
-  const templateId = pickTemplate(rng, difficulty, wave);
+  const templateId = pickTemplate(rng, difficulty, wave, options.allowedTemplates);
   const template = templateById(templateId);
-  const budget = buildBoardBudget(difficulty, wave, chapter);
-  const patternObjects = buildPatternObjects(template, rng, challenge, budget);
+  const budget = buildBoardBudget(difficulty, wave, chapter) + (options.budgetBonus ?? 0);
+  const patternObjects = buildPatternObjects(template, rng, challenge, budget, options);
 
   return {
-    id: `board_generated_${seed}_${difficulty}_${wave}_${chapter}_${template.id}`,
+    id: `board_generated_${seed}_${difficulty}_${wave}_${chapter}_${template.id}${options.idSuffix ? `_${options.idSuffix}` : ''}`,
     width: GAME_WIDTH,
     height: BOARD_HEIGHT,
     gravity: 1,
@@ -642,13 +662,16 @@ export function generateBoard(
   difficulty: number,
   wave: number,
   chapter = 1,
+  options: BoardGenerationOptions = {},
 ): BoardDef {
-  let fallback = buildGeneratedBoard(seed, difficulty, wave, chapter);
+  let fallback = buildGeneratedBoard(seed, difficulty, wave, chapter, options);
 
   for (let attempt = 0; attempt < MAX_PLAYABILITY_ATTEMPTS; attempt++) {
     const attemptSeed = retrySeed(seed, attempt);
     const board =
-      attempt === 0 ? fallback : buildGeneratedBoard(attemptSeed, difficulty, wave, chapter);
+      attempt === 0
+        ? fallback
+        : buildGeneratedBoard(attemptSeed, difficulty, wave, chapter, options);
     const report = evaluateBoardPlayability(board, attemptSeed);
 
     if (report.passed) return board;
