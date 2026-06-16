@@ -49,10 +49,54 @@ export class CombatSystem {
 
   private heroAttackCount(): number {
     const projectiles = Math.max(1, Math.round(this.hero.get(StatKey.ProjectileCount)));
-    const extra = this.hero.get(StatKey.ExtraAttack); // z.B. 0.6 → 60 % Zusatzangriff
+    // "Attack Speed" wird im Rundenmodell zu Zusatzangriffen (docs/04) — addiert
+    // sich mit ExtraAttack. Ganzzahliger Anteil garantiert, Bruchteil per Wurf.
+    const extra = this.hero.get(StatKey.ExtraAttack) + this.hero.get(StatKey.AttackSpeed);
     const frac = extra - Math.floor(extra);
     const bonus = Math.floor(extra) + (frac > 0 && this.rng.next() < frac ? 1 : 0);
     return projectiles + bonus;
+  }
+
+  /**
+   * Zusätzliche Ziele eines Projektils: Pierce (Durchschlag) + Ricochet (Abpraller)
+   * lassen es weitere lebende Gegner treffen (vorderste-zuerst). MVP: voller Schaden.
+   */
+  private projectileTargets(): EnemyInstance[] {
+    const extra =
+      Math.round(this.hero.get(StatKey.Pierce)) + Math.round(this.hero.get(StatKey.RicochetBounces));
+    return this.aliveEnemies().slice(0, 1 + Math.max(0, extra));
+  }
+
+  /** Löst einen einzelnen Treffer auf (Schaden, Ball-Drops, Lifesteal, Tod). */
+  private resolveHit(
+    target: EnemyInstance,
+    damage: number,
+    crit: boolean,
+    onHitChance: number,
+    lifesteal: number,
+  ): { result: HitResult; balls: number; heal: number } {
+    target.hp -= damage;
+    let balls = 0;
+    let heal = 0;
+    // Ball-Drop bei Treffer (ADR-002), pro aufgelöstem Treffer.
+    if (this.rng.next() < onHitChance) balls += 1;
+    heal += damage * lifesteal; // Lifesteal (gecappt über die StatEngine)
+    const onHit = this.effects.triggerOnHit(this.heroEffects, { rng: this.rng, damage });
+    balls += onHit.bonusBalls;
+    heal += onHit.heal;
+
+    const killed = target.hp <= 0;
+    if (killed) {
+      target.alive = false;
+      target.hp = 0;
+      balls += target.ballDrop; // garantierter Tod-Drop
+      balls += this.effects.triggerOnKill(this.heroEffects, { rng: this.rng }).bonusBalls;
+    }
+    return {
+      result: { targetId: target.instanceId, damage, crit, killed, remainingHp: Math.max(0, target.hp), ballsDropped: balls },
+      balls,
+      heal,
+    };
   }
 
   /** Held-Zug + Effekt-Auflösung (Schritte 1–2 der Runde, docs/04). */
@@ -69,41 +113,16 @@ export class CombatSystem {
 
     const attacks = this.heroAttackCount();
     for (let i = 0; i < attacks; i++) {
-      const target = this.frontmost();
-      if (!target) break; // Welle bereits leer
-
+      if (!this.frontmost()) break; // Welle bereits leer
       const crit = this.rng.next() < critChance;
       const damage = Math.round(dmgBase * (crit ? critMult : 1));
-      target.hp -= damage;
-
-      let ballsThisHit = 0;
-      // Ball-Drop bei Treffer (ADR-002 — als onHit modelliert, hier stat-getrieben).
-      if (this.rng.next() < onHitChance) ballsThisHit += 1;
-      // Lifesteal (gecappt über die StatEngine).
-      healed += damage * lifesteal;
-      // Content-onHit-Effekte des Helden (Signature/Items).
-      const onHit = this.effects.triggerOnHit(this.heroEffects, { rng: this.rng, damage });
-      ballsThisHit += onHit.bonusBalls;
-      healed += onHit.heal;
-
-      const killed = target.hp <= 0;
-      if (killed) {
-        target.alive = false;
-        target.hp = 0;
-        ballsThisHit += target.ballDrop; // garantierter Tod-Drop
-        const onKill = this.effects.triggerOnKill(this.heroEffects, { rng: this.rng });
-        ballsThisHit += onKill.bonusBalls;
+      // Ein Projektil kann via Pierce/Ricochet mehrere Gegner treffen.
+      for (const target of this.projectileTargets()) {
+        const { result, balls: b, heal } = this.resolveHit(target, damage, crit, onHitChance, lifesteal);
+        hits.push(result);
+        balls += b;
+        healed += heal;
       }
-
-      balls += ballsThisHit;
-      hits.push({
-        targetId: target.instanceId,
-        damage,
-        crit,
-        killed,
-        remainingHp: Math.max(0, target.hp),
-        ballsDropped: ballsThisHit,
-      });
     }
 
     healed = Math.round(healed);

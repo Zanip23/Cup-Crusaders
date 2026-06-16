@@ -12,6 +12,7 @@ import { Rng } from '@/core/rng/Rng';
 import { FLETCHER } from '@/content/heroes/fletcher';
 import { StatKey } from '@/core/stats/StatTypes';
 import { rollBossItem } from '@/systems/meta/loot';
+import { LEVEL_REGISTRY, WORLD_1 } from '@/content/waves/world-1';
 
 export const SceneKey = {
   Boot: 'Boot',
@@ -21,9 +22,6 @@ export const SceneKey = {
   Shop: 'Shop',
 } as const;
 
-// M1-Standard: Welt 1 mit 15 Wellen (14 + Boss), ADR-007.
-const DEFAULT_LEVEL = 'world_1';
-const DEFAULT_TOTAL_WAVES = 15;
 const DEFAULT_HERO_HP = FLETCHER.baseStats[StatKey.MaxHp] ?? 100;
 
 export class RunCoordinator {
@@ -34,7 +32,7 @@ export class RunCoordinator {
 
   /** Verbindet alle Loop-Events. Einmal beim Boot aufrufen. */
   wire(): void {
-    eventBus.on(GameEvent.StartRun, () => this.startNewRun());
+    eventBus.on(GameEvent.StartRun, ({ levelId }) => this.startNewRun(levelId));
 
     // Bälle werden während des Kampfes laufend gesammelt (Tod + Treffer-Chance).
     eventBus.on(GameEvent.CombatBallsCollected, ({ amount }) => {
@@ -87,12 +85,13 @@ export class RunCoordinator {
     this.go(SceneKey.Meta);
   }
 
-  /** Startet einen frischen Run (oder setzt ihn nach Reload an der Phase fort). */
-  startNewRun(): void {
+  /** Startet einen frischen Run. totalWaves kommt datengetrieben aus dem Level. */
+  startNewRun(levelId?: string): void {
+    const level = (levelId && LEVEL_REGISTRY[levelId]) || WORLD_1;
     this.gsm.dispatch({
       type: 'START_RUN',
-      levelId: DEFAULT_LEVEL,
-      totalWaves: DEFAULT_TOTAL_WAVES,
+      levelId: level.id,
+      totalWaves: level.waves.length,
       seed: Rng.randomSeed(),
       maxHp: DEFAULT_HERO_HP,
     });

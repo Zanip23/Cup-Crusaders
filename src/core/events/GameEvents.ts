@@ -18,7 +18,8 @@ export enum GameEvent {
 export interface GameEventPayloads {
   [GameEvent.CombatBallsCollected]: { amount: number };
   [GameEvent.HeroHpChanged]: { hp: number };
-  [GameEvent.CombatComplete]: { balls: number };
+  // Bälle werden laufend via CombatBallsCollected übergeben → kein Payload nötig.
+  [GameEvent.CombatComplete]: Record<string, never>;
   [GameEvent.DropComplete]: { balls: number };
   [GameEvent.ShopBuy]: { upgradeId: string; cost: number };
   [GameEvent.ShopComplete]: { pickedId?: string };

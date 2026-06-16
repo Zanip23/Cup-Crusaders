@@ -74,6 +74,28 @@ export const UPGRADES: UpgradeDef[] = [
     maxStacks: 3,
     effects: [mod(StatKey.LifestealPct, 'flat', 0.08)],
   },
+  {
+    id: 'piercing_shot',
+    name: 'Durchschlag',
+    description: '+1 durchschlagenes Ziel',
+    icon: '➹',
+    rarity: 'rare',
+    category: 'combat',
+    cost: 90,
+    maxStacks: 2,
+    effects: [mod(StatKey.Pierce, 'flat', 1)],
+  },
+  {
+    id: 'ricochet',
+    name: 'Querschläger',
+    description: '+1 Abpraller-Ziel',
+    icon: '↩️',
+    rarity: 'legendary',
+    category: 'combat',
+    cost: 320,
+    maxStacks: 2,
+    effects: [mod(StatKey.RicochetBounces, 'flat', 1)],
+  },
   // — Pachinko —
   {
     id: 'extra_ammo',

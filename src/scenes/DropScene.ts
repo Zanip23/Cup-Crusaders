@@ -65,6 +65,7 @@ export class DropScene extends Phaser.Scene {
     this.buildBoard();
     this.buildCup();
     this.buildControls();
+    this.setupKeyboard();
     this.registerCollisions();
 
     // Periodischer End-Check + Off-Screen-Despawn.
@@ -163,6 +164,16 @@ export class DropScene extends Phaser.Scene {
 
   private nudgeCup(dx: number): void {
     this.cup.x = Phaser.Math.Clamp(this.cup.x + dx, 60, GAME_WIDTH - 60);
+  }
+
+  // Tastatur als zusätzliche Eingabe (A11y/Desktop): ←/→ bewegen, Leer/Enter schüttet aus.
+  private setupKeyboard(): void {
+    const kb = this.input.keyboard;
+    if (!kb) return;
+    kb.on('keydown-LEFT', () => this.nudgeCup(-50));
+    kb.on('keydown-RIGHT', () => this.nudgeCup(50));
+    kb.on('keydown-SPACE', () => this.release());
+    kb.on('keydown-ENTER', () => this.release());
   }
 
   // ---- Ball-Lebenszyklus -------------------------------------------------

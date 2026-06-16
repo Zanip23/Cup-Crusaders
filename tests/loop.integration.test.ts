@@ -37,7 +37,7 @@ describe('Loop-Integration — Durchklicken Kampf → Drop → Shop → Kampf', 
     // Kampf: Bälle werden während des Kampfes laufend gesammelt, dann Abschluss.
     eventBus.emit(GameEvent.CombatBallsCollected, { amount: 15 });
     eventBus.emit(GameEvent.CombatBallsCollected, { amount: 10 });
-    eventBus.emit(GameEvent.CombatComplete, { balls: 25 });
+    eventBus.emit(GameEvent.CombatComplete, {});
     expect(gsm.getState().run.transfer.ballsFromCombat).toBe(25);
     expect(gsm.getState().run.phase).toBe('drop');
     expect(start).toHaveBeenLastCalledWith(SceneKey.Drop);
@@ -68,7 +68,7 @@ describe('Loop-Integration — Durchklicken Kampf → Drop → Shop → Kampf', 
     for (let wave = 1; wave <= 3; wave++) {
       expect(gsm.getState().run.waveNumber).toBe(wave);
       eventBus.emit(GameEvent.CombatBallsCollected, { amount: 30 });
-      eventBus.emit(GameEvent.CombatComplete, { balls: 30 });
+      eventBus.emit(GameEvent.CombatComplete, {});
       // Jede Welle startet mit frischem transfer → exakt 30, nie kumuliert.
       expect(gsm.getState().run.transfer.ballsFromCombat).toBe(30);
       eventBus.emit(GameEvent.DropComplete, { balls: 72 });
@@ -113,7 +113,7 @@ describe('Loop-Integration — Durchklicken Kampf → Drop → Shop → Kampf', 
   it('resumeOrStart routet an die gespeicherte Phase (Resume after reload)', () => {
     const { start, coordinator } = makeHarness();
     coordinator.startNewRun();
-    eventBus.emit(GameEvent.CombatComplete, { balls: 25 }); // jetzt in 'drop'
+    eventBus.emit(GameEvent.CombatComplete, {}); // jetzt in 'drop'
     start.mockClear();
 
     coordinator.resumeOrStart();

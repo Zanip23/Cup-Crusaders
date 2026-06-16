@@ -69,7 +69,8 @@ export class StatEngine {
     let value = (base + flat) * (1 + percentAdd) * percentMult;
     const cap = STAT_CAPS[stat];
     if (cap !== undefined) value = Math.min(value, cap);
-    return value;
+    // Unterschranke: kein Stat wird negativ (große negative Modifier abfangen).
+    return Math.max(0, value);
   }
 
   private invalidate(): void {

@@ -201,10 +201,11 @@ interface WaveDef {
 interface LevelDef {
   id: string;                  // 'world_1'
   name: string;
+  chapter: number;             // Kapitel-Index (1-basiert) für die Gegner-Skalierung
   waves: WaveDef[];            // letzte Welle typischerweise isBoss
   boardId: string;             // welches Pachinko-Board für die Drop-Phase
   dropCadence: 'everyWave' | 'levelEnd';
-  difficultyScaling: string;   // Scaling-Profil-ID
+  scalingProfileId: string;    // Verweis auf ein ScalingProfile (docs/10)
 }
 ```
 

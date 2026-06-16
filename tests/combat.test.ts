@@ -29,9 +29,9 @@ function deterministicHero(overrides: Partial<Record<StatKey, number>> = {}): St
   return e;
 }
 
-function enemy(hp: number, dmg: number, ballDrop: number): EnemyInstance {
+function enemy(hp: number, dmg: number, ballDrop: number, id = 'e1'): EnemyInstance {
   return {
-    instanceId: 'e1',
+    instanceId: id,
     defId: 'test',
     name: 'Test',
     role: 'normal',
@@ -88,6 +88,38 @@ describe('CombatSystem — rundenbasiertes Auto-Battle', () => {
     const r = cs.enemyTurn();
     expect(r.attacks[0].dealt).toBe(10);
     expect(cs.getHeroHp()).toBe(90);
+  });
+
+  it('Pierce lässt ein Projektil zusätzliche Ziele treffen', () => {
+    const hero = deterministicHero({ [StatKey.Pierce]: 1, [StatKey.ProjectileCount]: 1 });
+    const cs = new CombatSystem(
+      hero,
+      [enemy(1000, 0, 0, 'a'), enemy(1000, 0, 0, 'b')],
+      new Rng(1),
+      new EffectSystem(),
+      100,
+    );
+    const r = cs.heroTurn();
+    expect(r.hits).toHaveLength(2); // 1 Projektil → 2 Gegner
+    expect(new Set(r.hits.map((h) => h.targetId)).size).toBe(2);
+  });
+
+  it('Ricochet lässt ein Projektil abprallen (zusätzliches Ziel)', () => {
+    const hero = deterministicHero({ [StatKey.RicochetBounces]: 1, [StatKey.ProjectileCount]: 1 });
+    const cs = new CombatSystem(
+      hero,
+      [enemy(1000, 0, 0, 'a'), enemy(1000, 0, 0, 'b')],
+      new Rng(1),
+      new EffectSystem(),
+      100,
+    );
+    expect(cs.heroTurn().hits).toHaveLength(2);
+  });
+
+  it('AttackSpeed erzeugt Zusatzangriffe (docs/04)', () => {
+    const hero = deterministicHero({ [StatKey.AttackSpeed]: 1, [StatKey.ProjectileCount]: 1 });
+    const cs = new CombatSystem(hero, [enemy(100000, 0, 0)], new Rng(1), new EffectSystem(), 100);
+    expect(cs.heroTurn().hits).toHaveLength(2); // 1 + 1 AttackSpeed
   });
 
   it('Held stirbt, wenn HP auf 0 fällt', () => {

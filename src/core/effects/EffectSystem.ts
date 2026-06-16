@@ -4,7 +4,7 @@
 
 import type { Effect } from '@/types/content';
 import type { ModifierOp, ModifierScope } from '@/core/stats/StatTypes';
-import { StatKey } from '@/core/stats/StatTypes';
+import { StatKey, STAT_CAPS } from '@/core/stats/StatTypes';
 import type { StatEngine } from '@/core/stats/StatEngine';
 import type { Rng } from '@/core/rng/Rng';
 
@@ -54,7 +54,9 @@ export class EffectSystem {
       if (e.type !== 'onHit') continue;
       const kind = e.params.kind;
       if (kind === 'lifesteal') {
-        out.heal += ctx.damage * Number(e.params.pct ?? 0);
+        // Lifesteal-Cap (ADR-010) auch für onHit-Effekte erzwingen.
+        const pct = Math.min(Number(e.params.pct ?? 0), STAT_CAPS[StatKey.LifestealPct] ?? 1);
+        out.heal += ctx.damage * pct;
       } else if (kind === 'bonusBall') {
         if (ctx.rng.next() < Number(e.params.chance ?? 0)) out.bonusBalls += 1;
       }

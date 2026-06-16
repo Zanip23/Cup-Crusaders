@@ -167,8 +167,7 @@ export class CombatScene extends Phaser.Scene {
 
   private endCombat(): void {
     this.finished = true;
-    const balls = selectBallsFromCombat(getGsm(this).getState());
-    this.time.delayedCall(400, () => eventBus.emit(GameEvent.CombatComplete, { balls }));
+    this.time.delayedCall(400, () => eventBus.emit(GameEvent.CombatComplete, {}));
   }
 
   // ---- Animation / VFX ---------------------------------------------------

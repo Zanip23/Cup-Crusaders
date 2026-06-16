@@ -42,6 +42,13 @@ describe('StatEngine — Berechnungsreihenfolge & Caps (docs/08)', () => {
     expect(e.get(StatKey.Armor)).toBe(0);
   });
 
+  it('klammert nie unter 0 (große negative Modifier)', () => {
+    const e = new StatEngine();
+    e.setBase({ [StatKey.AttackDamage]: 10 });
+    e.addModifier({ stat: StatKey.AttackDamage, op: 'percentAdd', value: -2, scope: 'run', sourceId: 'x' });
+    expect(e.get(StatKey.AttackDamage)).toBe(0); // 10×(1−2) = −10 → 0
+  });
+
   it('pruneExpired entfernt abgelaufene buffs', () => {
     const e = new StatEngine();
     e.setBase({ [StatKey.AttackDamage]: 10 });
@@ -71,6 +78,14 @@ describe('EffectSystem — addModifier / onHit / onKill (docs/08 §2)', () => {
       { rng: new Rng(1), damage: 50 },
     );
     expect(out.heal).toBeCloseTo(5);
+  });
+
+  it('triggerOnHit: Lifesteal-Effekt respektiert das Cap (ADR-010)', () => {
+    const out = new EffectSystem().triggerOnHit(
+      [{ type: 'onHit', params: { kind: 'lifesteal', pct: 0.9 } }],
+      { rng: new Rng(1), damage: 100 },
+    );
+    expect(out.heal).toBeCloseTo(20); // 100 × min(0.9, 0.2)
   });
 
   it('triggerOnKill: bonusBall mit amount', () => {
