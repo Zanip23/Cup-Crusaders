@@ -21,6 +21,8 @@ type MatterBody = MatterJS.BodyType & { gameObject?: Phaser.GameObjects.Arc | nu
 
 const BALL_RADIUS = 8;
 const DRIP_INTERVAL_MS = 60;
+const MAX_BONUS_BALLS_PER_GATE = 4;
+const STRONG_GATE_THRESHOLD = 3;
 const SPIN_TIMEOUT_MS = 18000; // Timeout-Sicherung: Phase endet garantiert
 const CUP_Y = 180;
 
@@ -571,10 +573,124 @@ export class DropScene extends Phaser.Scene {
     const passed = go.getData('gates') as Set<string>;
     if (passed.has(id)) return; // pro Ball nur einmal pro Zone
     passed.add(id);
-    const value = applyGateEffect(go.getData('value') as number, effect);
+
+    const previousValue = go.getData('value') as number;
+    const value = applyGateEffect(previousValue, effect);
     go.setData('value', value);
+    this.flashBallValue(go, value);
+
+    if (effect.type === 'gateMultiply') {
+      const factor = Math.max(1, Math.floor(Number(effect.params.factor ?? 1)));
+      const bonusCount = Math.min(factor - 1, MAX_BONUS_BALLS_PER_GATE);
+      this.spawnBonusBalls(go, bonusCount, previousValue, passed);
+      this.playGateJuice(go.x, go.y, `x${factor}!`, factor >= STRONG_GATE_THRESHOLD);
+      return;
+    }
+
+    if (effect.type === 'gateAdd') {
+      const amount = Math.max(0, Math.floor(Number(effect.params.amount ?? 0)));
+      const bonusCount = Math.min(Math.floor(amount / 5), MAX_BONUS_BALLS_PER_GATE);
+      if (bonusCount > 0) this.spawnBonusBalls(go, bonusCount, 1, passed);
+      this.playGateJuice(go.x, go.y, `+${amount}!`, amount >= 5);
+    }
+  }
+
+  private spawnBonusBalls(
+    sourceBall: Phaser.GameObjects.Arc,
+    count: number,
+    inheritedValue: number,
+    inheritedGates?: Set<string>,
+  ): void {
+    const availableSlots = this.board.maxConcurrentBalls - this.active.size;
+    const spawnCount = Math.max(0, Math.min(count, MAX_BONUS_BALLS_PER_GATE, availableSlots));
+    if (spawnCount <= 0) return;
+
+    const sourceBody = sourceBall.body as MatterBody | null;
+    for (let i = 0; i < spawnCount; i += 1) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const spread = 10 + Math.floor(i / 2) * 7;
+      const x = Phaser.Math.Clamp(
+        sourceBall.x + side * spread,
+        BALL_RADIUS,
+        GAME_WIDTH - BALL_RADIUS,
+      );
+      const y = sourceBall.y - Phaser.Math.Between(4, 12);
+      const ball = this.add.circle(x, y, BALL_RADIUS, 0xdff7ff).setDepth(sourceBall.depth);
+      ball.setData('value', inheritedValue);
+      ball.setData('gates', new Set(inheritedGates ?? []));
+      this.matter.add.gameObject(ball, {
+        shape: { type: 'circle', radius: BALL_RADIUS },
+        restitution: this.board.defaultRestitution,
+        friction: 0,
+        frictionAir: 0.008,
+        label: 'ball',
+      });
+      const body = ball.body as MatterBody;
+      body.collisionFilter.group = -1; // Bälle kollidieren nicht untereinander (Perf)
+      body.velocity.x =
+        (sourceBody?.velocity.x ?? 0) * 0.35 + side * Phaser.Math.FloatBetween(1.7, 3.2);
+      body.velocity.y =
+        Math.min(sourceBody?.velocity.y ?? 0, -1.5) - Phaser.Math.FloatBetween(0.8, 2.2);
+      this.active.add(ball);
+      this.flashBallValue(ball, inheritedValue);
+    }
+  }
+
+  private flashBallValue(go: Phaser.GameObjects.Arc, value: number): void {
     go.setFillStyle(value >= 10 ? 0xf4c430 : value >= 2 ? 0xffa726 : 0xffffff);
-    this.tweens.add({ targets: go, scale: 1.5, duration: 90, yoyo: true });
+    this.tweens.add({ targets: go, scale: 1.55, alpha: 0.78, duration: 90, yoyo: true });
+  }
+
+  private playGateJuice(x: number, y: number, label: string, strong: boolean): void {
+    const color = strong ? '#fff4a3' : '#ffffff';
+    const stroke = strong ? '#7a3f00' : '#0b1324';
+    const text = this.add
+      .text(x, y - 30, label, {
+        fontSize: strong ? '34px' : '26px',
+        color,
+        fontStyle: 'bold',
+        stroke,
+        strokeThickness: strong ? 7 : 5,
+      })
+      .setOrigin(0.5)
+      .setDepth(35);
+
+    const glow = this.add
+      .circle(x, y, strong ? 46 : 34, strong ? 0xf4c430 : DROP_COLORS.glow, 0.28)
+      .setDepth(6);
+    this.tweens.add({
+      targets: glow,
+      scale: 1.7,
+      alpha: 0,
+      duration: 360,
+      onComplete: () => glow.destroy(),
+    });
+    this.tweens.add({
+      targets: text,
+      y: y - 82,
+      scale: strong ? 1.18 : 1.08,
+      alpha: 0,
+      duration: 620,
+      ease: 'Cubic.easeOut',
+      onComplete: () => text.destroy(),
+    });
+
+    for (let i = 0; i < (strong ? 14 : 8); i += 1) {
+      const particle = this.add
+        .circle(x, y, Phaser.Math.FloatBetween(2, 4), strong ? 0xfff4a3 : 0xdff7ff, 0.92)
+        .setDepth(34);
+      this.tweens.add({
+        targets: particle,
+        x: x + Phaser.Math.Between(-42, 42),
+        y: y + Phaser.Math.Between(-34, 26),
+        alpha: 0,
+        scale: 0.2,
+        duration: Phaser.Math.Between(260, 460),
+        onComplete: () => particle.destroy(),
+      });
+    }
+
+    if (strong) this.cameras.main.shake(110, 0.0045);
   }
 
   private handleBooster(go: Phaser.GameObjects.Arc, body: MatterBody, index: number): void {
