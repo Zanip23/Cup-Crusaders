@@ -3,6 +3,7 @@
 // Funnel-Zonen frei und nutzt bewusste Zonen/Pattern statt komplettem Zufall.
 
 import { Rng } from '@/core/rng/Rng';
+import { evaluateBoardPlayability } from '@/systems/drop/BoardPlayability';
 import type {
   BinDef,
   BoardBlockerDef,
@@ -24,6 +25,7 @@ const SAFE_BOTTOM_Y = FUNNEL_TOP_Y - 35;
 const PEG_RADIUS = 7;
 const BIN_COUNT = 5;
 const MAX_CONCURRENT_BALLS = 200;
+const MAX_PLAYABILITY_ATTEMPTS = 8;
 
 export const GATE_COSTS = {
   add: 9,
@@ -595,11 +597,11 @@ function buildBins(
  * Gleiche Eingaben liefern immer dasselbe Layout; Difficulty und Wave erhöhen
  * Peg-Dichte, Varianz und Bonuswerte schrittweise.
  */
-export function generateBoard(
+function buildGeneratedBoard(
   seed: number,
   difficulty: number,
   wave: number,
-  chapter = 1,
+  chapter: number,
 ): BoardDef {
   const rng = new Rng(
     (seed ^ Math.imul(difficulty, 0x45d9f3b) ^ Math.imul(wave, 0x119de1f3)) >>> 0,
@@ -621,4 +623,29 @@ export function generateBoard(
     bins: buildBins(challenge, rng, budget, template),
     maxConcurrentBalls: MAX_CONCURRENT_BALLS,
   };
+}
+
+function retrySeed(seed: number, attempt: number): number {
+  return (seed + Math.imul(attempt, 0x9e3779b9)) >>> 0;
+}
+
+export function generateBoard(
+  seed: number,
+  difficulty: number,
+  wave: number,
+  chapter = 1,
+): BoardDef {
+  let fallback = buildGeneratedBoard(seed, difficulty, wave, chapter);
+
+  for (let attempt = 0; attempt < MAX_PLAYABILITY_ATTEMPTS; attempt++) {
+    const attemptSeed = retrySeed(seed, attempt);
+    const board =
+      attempt === 0 ? fallback : buildGeneratedBoard(attemptSeed, difficulty, wave, chapter);
+    const report = evaluateBoardPlayability(board, attemptSeed);
+
+    if (report.passed) return board;
+    fallback = board;
+  }
+
+  return fallback;
 }
