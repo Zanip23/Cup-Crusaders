@@ -18,6 +18,7 @@ import type { BoardDef } from '@/types/content';
 // summiert nur tatsächliche Ergebnisse — kein Steering.
 
 type MatterBody = MatterJS.BodyType & { gameObject?: Phaser.GameObjects.Arc | null };
+type BinFxKind = 'jackpot' | 'nearMiss' | 'good' | 'normal';
 
 const BALL_RADIUS = 8;
 const DRIP_INTERVAL_MS = 34;
@@ -816,7 +817,7 @@ export class DropScene extends Phaser.Scene {
       const factor = Math.max(1, Math.floor(Number(effect.params.factor ?? 1)));
       const bonusCount = Math.min(factor - 1, MAX_BONUS_BALLS_PER_GATE);
       this.spawnBonusBalls(go, bonusCount, previousValue, passed);
-      this.playGateJuice(go.x, go.y, `x${factor}!`, factor >= STRONG_GATE_THRESHOLD);
+      this.playGateFx(go.x, go.y, `x${factor}!`, factor >= STRONG_GATE_THRESHOLD);
       return;
     }
 
@@ -824,7 +825,7 @@ export class DropScene extends Phaser.Scene {
       const amount = Math.max(0, Math.floor(Number(effect.params.amount ?? 0)));
       const bonusCount = Math.min(Math.floor(amount / 5), MAX_BONUS_BALLS_PER_GATE);
       if (bonusCount > 0) this.spawnBonusBalls(go, bonusCount, 1, passed);
-      this.playGateJuice(go.x, go.y, `+${amount}!`, amount >= 5);
+      this.playGateFx(go.x, go.y, `+${amount}!`, amount >= 5);
     }
   }
 
@@ -874,7 +875,7 @@ export class DropScene extends Phaser.Scene {
     this.tweens.add({ targets: go, scale: 1.55, alpha: 0.78, duration: 90, yoyo: true });
   }
 
-  private playGateJuice(x: number, y: number, label: string, strong: boolean): void {
+  private playGateFx(x: number, y: number, label: string, strong: boolean): void {
     const color = strong ? '#fff4a3' : '#ffffff';
     const stroke = strong ? '#7a3f00' : '#0b1324';
     const text = this.add
@@ -940,7 +941,9 @@ export class DropScene extends Phaser.Scene {
     go.setData('resolved', true);
     const bin = this.board.bins[index];
     const contribution = this.resolver.collect(go.getData('value') as number, bin.multiplier);
-    this.floatingContribution(go.x, go.y, contribution, this.binResultKind(index));
+    const result = this.binResultKind(index, contribution);
+    this.playBinFx(go.x, go.y, contribution, result);
+    if (result === 'jackpot') this.playJackpotFx(go.x, go.y);
     this.despawn(go);
     this.sumText.setText(`Σ ${this.resolver.total()}`);
     this.checkEnd();
@@ -952,83 +955,133 @@ export class DropScene extends Phaser.Scene {
     go.destroy();
   }
 
-  private binResultKind(index: number): 'jackpot' | 'nearMiss' | 'normal' {
-    const jackpotIndex = this.board.bins.reduce(
-      (best, bin, i) => (bin.multiplier > this.board.bins[best].multiplier ? i : best),
-      0,
-    );
-    if (index === jackpotIndex) return 'jackpot';
-    if (Math.abs(index - jackpotIndex) === 1) return 'nearMiss';
+  private binResultKind(index: number, contribution: number): BinFxKind {
+    const bin = this.board.bins[index];
+    const jackpotIndexes = this.board.bins
+      .map((candidate, candidateIndex) => (candidate.multiplier >= 10 ? candidateIndex : -1))
+      .filter((candidateIndex) => candidateIndex >= 0);
+    const nearJackpot = jackpotIndexes.some((jackpotIndex) => Math.abs(index - jackpotIndex) === 1);
+    if (bin.multiplier >= 10) return 'jackpot';
+    if (nearJackpot) return 'nearMiss';
+    if (bin.multiplier >= 3 || contribution >= 5) return 'good';
     return 'normal';
   }
 
-  private floatingContribution(
-    x: number,
-    y: number,
-    amount: number,
-    result: 'jackpot' | 'nearMiss' | 'normal',
-  ): void {
+  private playBinFx(x: number, y: number, amount: number, result: BinFxKind): void {
+    this.floatingContribution(x, y, amount, result);
+    if (result === 'good') this.cameras.main.shake(80, 0.002);
+    if (result === 'nearMiss') {
+      this.playOptionalSound('drop-near-miss');
+      this.cameras.main.shake(120, 0.0035);
+    }
+  }
+
+  private floatingContribution(x: number, y: number, amount: number, result: BinFxKind): void {
     const jackpot = result === 'jackpot';
     const nearMiss = result === 'nearMiss';
-    const label = nearMiss ? `KNAPP! +${amount}` : `+${amount}`;
+    const good = result === 'good';
+    const highContribution = jackpot || good || amount >= 10;
+    const label = nearMiss ? `KNAPP! +${amount}` : jackpot ? `JACKPOT +${amount}` : `+${amount}`;
+    const color = jackpot ? '#fff4a3' : good ? '#72f7a6' : nearMiss ? '#ffd3a6' : '#dff7ff';
+    const stroke = jackpot ? '#6b3f00' : good ? '#074a26' : nearMiss ? '#633000' : '#0b1324';
+    const burstColor = jackpot
+      ? DROP_COLORS.jackpotGlow
+      : good
+        ? DROP_COLORS.greenGate
+        : DROP_COLORS.nearMiss;
     const t = this.add
       .text(x, y, label, {
-        fontSize: jackpot ? '42px' : nearMiss ? '28px' : '22px',
-        color: jackpot ? '#fff4a3' : nearMiss ? '#ffd3a6' : '#ffffff',
+        fontSize: jackpot ? '44px' : good ? '32px' : nearMiss ? '28px' : '22px',
+        color,
         fontStyle: 'bold',
-        stroke: jackpot ? '#6b3f00' : nearMiss ? '#633000' : '#0b1324',
-        strokeThickness: jackpot ? 8 : nearMiss ? 6 : 5,
+        stroke,
+        strokeThickness: jackpot ? 8 : good || nearMiss ? 6 : 5,
       })
       .setOrigin(0.5)
+      .setScale(0.4)
       .setDepth(34);
 
     const burst = this.add
       .circle(
         x,
         y,
-        jackpot ? 68 : nearMiss ? 42 : 26,
-        jackpot ? DROP_COLORS.jackpotGlow : DROP_COLORS.nearMiss,
-        jackpot ? 0.42 : nearMiss ? 0.28 : 0.16,
+        jackpot ? 76 : good ? 50 : nearMiss ? 42 : 26,
+        burstColor,
+        jackpot ? 0.46 : good ? 0.34 : nearMiss ? 0.28 : 0.16,
       )
       .setDepth(29);
     this.tweens.add({
       targets: burst,
-      scale: jackpot ? 2.2 : nearMiss ? 1.55 : 1.2,
+      scale: jackpot ? 2.35 : good ? 1.75 : nearMiss ? 1.55 : 1.2,
       alpha: 0,
-      duration: jackpot ? 520 : 360,
+      duration: jackpot ? 560 : good ? 440 : 360,
       ease: 'Cubic.easeOut',
       onComplete: () => burst.destroy(),
     });
     this.tweens.add({
       targets: t,
-      y: y - (jackpot ? 82 : nearMiss ? 56 : 40),
-      scale: jackpot ? 1.22 : nearMiss ? 1.1 : 1,
+      scale: jackpot ? 1.26 : good ? 1.14 : nearMiss ? 1.08 : 1,
+      duration: 140,
+      ease: 'Back.easeOut',
+    });
+    this.tweens.add({
+      targets: t,
+      y: y - (jackpot ? 90 : good ? 66 : nearMiss ? 56 : 40),
       alpha: 0,
-      duration: jackpot ? 860 : nearMiss ? 720 : 600,
+      delay: 90,
+      duration: jackpot ? 860 : good ? 760 : nearMiss ? 720 : 600,
       ease: 'Cubic.easeOut',
       onComplete: () => t.destroy(),
     });
 
-    if (jackpot) {
-      this.cameras.main.flash(180, 255, 210, 90, false, undefined, 0.18);
-      this.cameras.main.shake(170, 0.006);
-      for (let i = 0; i < 22; i += 1) {
-        const sparkle = this.add
-          .circle(x, y, Phaser.Math.FloatBetween(2, 5), 0xfff4a3, 0.95)
-          .setDepth(33);
-        this.tweens.add({
-          targets: sparkle,
-          x: x + Phaser.Math.Between(-78, 78),
-          y: y + Phaser.Math.Between(-72, 38),
-          alpha: 0,
-          scale: 0.15,
-          duration: Phaser.Math.Between(320, 620),
-          onComplete: () => sparkle.destroy(),
-        });
-      }
-    } else if (nearMiss) {
-      this.cameras.main.shake(90, 0.0025);
+    if (highContribution) {
+      const sparkleCount = jackpot ? 26 : amount >= 10 ? 16 : 10;
+      for (let i = 0; i < sparkleCount; i += 1) this.addSparkle(x, y, jackpot);
     }
+  }
+
+  private addSparkle(x: number, y: number, jackpot: boolean): void {
+    const points = 5;
+    const sparkle = this.add
+      .star(
+        x,
+        y,
+        points,
+        Phaser.Math.FloatBetween(2, 4),
+        Phaser.Math.FloatBetween(jackpot ? 8 : 6, jackpot ? 14 : 10),
+        jackpot ? 0xfff4a3 : 0x72f7a6,
+        0.95,
+      )
+      .setDepth(33);
+    this.tweens.add({
+      targets: sparkle,
+      x: x + Phaser.Math.Between(jackpot ? -92 : -58, jackpot ? 92 : 58),
+      y: y + Phaser.Math.Between(jackpot ? -84 : -52, jackpot ? 44 : 32),
+      angle: Phaser.Math.Between(-180, 180),
+      alpha: 0,
+      scale: 0.15,
+      duration: Phaser.Math.Between(340, jackpot ? 700 : 560),
+      onComplete: () => sparkle.destroy(),
+    });
+  }
+
+  private playJackpotFx(x: number, y: number): void {
+    this.playOptionalSound('drop-jackpot');
+    this.cameras.main.flash(240, 255, 210, 90, false, undefined, 0.24);
+    this.cameras.main.shake(260, 0.01);
+    const glow = this.add.circle(x, y, 92, DROP_COLORS.jackpotGlow, 0.42).setDepth(28);
+    this.tweens.add({
+      targets: glow,
+      scale: 2.8,
+      alpha: 0,
+      duration: 760,
+      ease: 'Cubic.easeOut',
+      onComplete: () => glow.destroy(),
+    });
+  }
+
+  private playOptionalSound(key: string): void {
+    if (this.cache.audio.exists(key)) this.sound.play(key);
   }
 
   // ---- Phasenende --------------------------------------------------------
@@ -1064,7 +1117,69 @@ export class DropScene extends Phaser.Scene {
     this.finished = true;
     this.dripTimer?.remove();
     const balls = this.resolver.total();
-    this.sumText.setText(`Σ ${balls}`);
-    this.time.delayedCall(500, () => eventBus.emit(GameEvent.DropComplete, { balls }));
+    this.showDropSummary(balls, () => eventBus.emit(GameEvent.DropComplete, { balls }));
+  }
+
+  private showDropSummary(total: number, onComplete: () => void): void {
+    this.playOptionalSound('drop-summary');
+    this.sumText.setText('Σ 0');
+    const overlay = this.add
+      .rectangle(CENTER_X, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x02040a, 0.42)
+      .setDepth(80);
+    const panel = this.add
+      .rectangle(CENTER_X, GAME_HEIGHT / 2, 330, 150, 0x101f35, 0.94)
+      .setStrokeStyle(4, DROP_COLORS.glow, 0.86)
+      .setDepth(81);
+    const title = this.add
+      .text(CENTER_X, GAME_HEIGHT / 2 - 42, 'Drop-Auswertung', {
+        fontSize: '24px',
+        color: '#dff7ff',
+        fontStyle: 'bold',
+        stroke: '#06111f',
+        strokeThickness: 5,
+      })
+      .setOrigin(0.5)
+      .setDepth(82);
+    const summary = this.add
+      .text(CENTER_X, GAME_HEIGHT / 2 + 14, 'Gesamt: 0', {
+        fontSize: '38px',
+        color: '#fff4a3',
+        fontStyle: 'bold',
+        stroke: '#6b3f00',
+        strokeThickness: 7,
+      })
+      .setOrigin(0.5)
+      .setDepth(82);
+
+    const counter = { value: 0 };
+    this.tweens.add({
+      targets: [overlay, panel, title, summary],
+      alpha: { from: 0, to: 1 },
+      duration: 180,
+      ease: 'Sine.easeOut',
+    });
+    this.tweens.add({
+      targets: panel,
+      scaleX: { from: 0.82, to: 1 },
+      scaleY: { from: 0.82, to: 1 },
+      duration: 260,
+      ease: 'Back.easeOut',
+    });
+    this.tweens.add({
+      targets: counter,
+      value: total,
+      duration: Phaser.Math.Clamp(total * 28, 520, 1200),
+      ease: 'Cubic.easeOut',
+      onUpdate: () => {
+        const current = Math.round(counter.value);
+        this.sumText.setText(`Σ ${current}`);
+        summary.setText(`Gesamt: ${current}`);
+      },
+      onComplete: () => {
+        this.sumText.setText(`Σ ${total}`);
+        summary.setText(`Gesamt: ${total}`);
+        this.time.delayedCall(450, onComplete);
+      },
+    });
   }
 }
