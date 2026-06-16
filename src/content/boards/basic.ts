@@ -4,6 +4,7 @@
 // ändern), und ein unten angesetzter TRICHTER leitet alles in den Fang-Becher.
 // ADR-009: reine Physik bestimmt das Ergebnis.
 
+import { createMysteryEffect } from '@/content/boards/mysteryPools';
 import type { BoardDef, BoardBlockerDef, BoardPlatformDef, Effect } from '@/types/content';
 import { GAME_WIDTH } from '@/ui/layout';
 
@@ -18,14 +19,24 @@ const BAR_COLOR = {
   boost: 0x4cc9f0, // blau: ⌃ Boost
 } as const;
 
+function defaultBins() {
+  const binW = W / 5;
+  return [1, 2, 5, 2, 1].map((multiplier, index) => ({
+    x: index * binW,
+    w: binW,
+    multiplier,
+    label: `x${multiplier}`,
+  }));
+}
+
 function mult(factor: number): Effect {
   return { type: 'gateMultiply', params: { factor } };
 }
 function bonus(amount: number): Effect {
   return { type: 'gateAdd', params: { amount } };
 }
-function mystery(min: number, max: number): Effect {
-  return { type: 'gateMystery', params: { min, max } };
+function mystery(pool: 'standard' | 'risky' = 'standard'): Effect {
+  return createMysteryEffect(pool);
 }
 
 // Ein Balken-Segment in einer Reihe.
@@ -58,18 +69,33 @@ export const BOARD_BASIC: BoardDef = {
     bar(W * 0.18, 430, 250, 'x3', mult(3), BAR_COLOR.mult),
     bar(W * 0.68, 430, 330, 'x4', mult(4), BAR_COLOR.high),
     // Reihe 2: ??? | x2
-    bar(W * 0.2, 620, 250, '???', mystery(2, 5), BAR_COLOR.mystery),
+    bar(W * 0.2, 620, 250, '???', mystery('standard'), BAR_COLOR.mystery),
     bar(W * 0.74, 620, 270, 'x2', mult(2), BAR_COLOR.mult),
     // Reihe 3: x2 | (Boost) | x2
     bar(W * 0.16, 820, 200, 'x2', mult(2), BAR_COLOR.mult),
     bar(W * 0.82, 820, 200, 'x2', mult(2), BAR_COLOR.mult),
   ],
   boosters: [
-    { x: W * 0.5, y: 820, w: 168, h: 34, label: '▲ BOOST', effect: mult(2), color: BAR_COLOR.boost },
+    {
+      x: W * 0.5,
+      y: 820,
+      w: 168,
+      h: 34,
+      label: '▲ BOOST',
+      effect: mult(2),
+      color: BAR_COLOR.boost,
+    },
   ],
-  blockers: [post(W * 0.43, 470, 110), post(W * 0.5, 660, 90), post(W * 0.62, 660, 90), post(W * 0.36, 860, 80), post(W * 0.64, 860, 80)],
+  blockers: [
+    post(W * 0.43, 470, 110),
+    post(W * 0.5, 660, 90),
+    post(W * 0.62, 660, 90),
+    post(W * 0.36, 860, 80),
+    post(W * 0.64, 860, 80),
+  ],
   gates: [],
-  maxConcurrentBalls: 420,
+  bins: defaultBins(),
+  maxConcurrentBalls: 250,
 };
 
 export const BOARD_DENSE: BoardDef = {
@@ -87,18 +113,33 @@ export const BOARD_DENSE: BoardDef = {
     bar(W * 0.5, 400, 180, 'x2', mult(2), BAR_COLOR.mult),
     // Reihe 2: x4 | x3
     bar(W * 0.42, 600, 430, 'x4', mult(4), BAR_COLOR.high),
-    bar(W * 0.9, 600, 150, 'x3', mult(3), BAR_COLOR.mult),
+    bar(W * 0.89, 600, 150, 'x3', mult(3), BAR_COLOR.mult),
     // Reihe 3: x2 | ??? | x2
     bar(W * 0.16, 800, 200, 'x2', mult(2), BAR_COLOR.mult),
-    bar(W * 0.5, 800, 200, '???', mystery(2, 6), BAR_COLOR.mystery),
+    bar(W * 0.5, 800, 200, '???', mystery('risky'), BAR_COLOR.mystery),
     bar(W * 0.84, 800, 200, 'x2', mult(2), BAR_COLOR.mult),
   ],
   boosters: [
-    { x: W * 0.3, y: 800, w: 150, h: 32, label: '▲ BOOST', effect: mult(2), color: BAR_COLOR.boost },
+    {
+      x: W * 0.3,
+      y: 800,
+      w: 150,
+      h: 32,
+      label: '▲ BOOST',
+      effect: mult(2),
+      color: BAR_COLOR.boost,
+    },
   ],
-  blockers: [post(W * 0.36, 440, 100), post(W * 0.64, 440, 100), post(W * 0.78, 640, 90), post(W * 0.36, 840, 80), post(W * 0.64, 840, 80)],
+  blockers: [
+    post(W * 0.36, 440, 100),
+    post(W * 0.64, 440, 100),
+    post(W * 0.78, 640, 90),
+    post(W * 0.36, 840, 80),
+    post(W * 0.64, 840, 80),
+  ],
   gates: [],
-  maxConcurrentBalls: 420,
+  bins: defaultBins(),
+  maxConcurrentBalls: 250,
 };
 
 export const BOARD_REGISTRY: Record<string, BoardDef> = {
