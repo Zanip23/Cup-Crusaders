@@ -6,7 +6,7 @@ import { StatKey } from '@/core/stats/StatTypes';
 import type { ModifierOp } from '@/core/stats/StatTypes';
 import { RARITIES, type EquipSlot } from '@/types/content';
 import { ENEMY_REGISTRY } from '@/content/enemies';
-import { LEVEL_REGISTRY } from '@/content/waves/world-1';
+import { LEVEL_REGISTRY } from '@/content/levels';
 import { BOARD_REGISTRY } from '@/content/boards/basic';
 import { ITEMS } from '@/content/items';
 import { UPGRADES, type UpgradeCategory } from '@/content/upgrades';

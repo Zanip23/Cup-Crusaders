@@ -110,6 +110,33 @@ describe('Loop-Integration — Durchklicken Kampf → Drop → Shop → Kampf', 
     expect(start).toHaveBeenLastCalledWith(SceneKey.Combat);
   });
 
+  it('Boss-Sieg führt ins nächste Level; finaler Boss beendet den Run als Sieg', () => {
+    const { start, gsm, coordinator } = makeHarness();
+    coordinator.startNewRun(); // world_1, Welle 1
+    const clearWaves = (n: number) => {
+      for (let i = 0; i < n; i++) eventBus.emit(GameEvent.ShopComplete, {});
+    };
+    // Wellen 1→15 (14× Nicht-Boss-Abschluss bringt waveNumber auf 15 = Boss).
+    clearWaves(14);
+    expect(gsm.getState().run.waveNumber).toBe(15);
+
+    // Boss von Welt 1 abschließen → Item-Drop + Vorrücken nach Welt 2.
+    eventBus.emit(GameEvent.ShopComplete, {});
+    expect(gsm.getState().run.levelId).toBe('world_2');
+    expect(gsm.getState().run.waveNumber).toBe(1);
+    expect(gsm.getState().meta.inventory.length).toBe(1); // garantierter Boss-Drop
+    expect(start).toHaveBeenLastCalledWith(SceneKey.Combat);
+
+    // Durch Welt 2 bis zum finalen Boss → Run-Sieg → Menü.
+    clearWaves(14);
+    expect(gsm.getState().run.waveNumber).toBe(15);
+    eventBus.emit(GameEvent.ShopComplete, {});
+    expect(gsm.getState().run.phase).toBe('menu');
+    expect(gsm.getState().meta.inventory.length).toBe(2);
+    expect(gsm.getState().meta.currencies.gold).toBeGreaterThan(0);
+    expect(start).toHaveBeenLastCalledWith(SceneKey.Meta);
+  });
+
   it('resumeOrStart routet an die gespeicherte Phase (Resume after reload)', () => {
     const { start, coordinator } = makeHarness();
     coordinator.startNewRun();

@@ -12,7 +12,7 @@ import { Rng } from '@/core/rng/Rng';
 import { FLETCHER } from '@/content/heroes/fletcher';
 import { StatKey } from '@/core/stats/StatTypes';
 import { rollBossItem } from '@/systems/meta/loot';
-import { LEVEL_REGISTRY, WORLD_1 } from '@/content/waves/world-1';
+import { getLevel, nextLevel } from '@/content/levels';
 
 export const SceneKey = {
   Boot: 'Boot',
@@ -63,7 +63,7 @@ export class RunCoordinator {
       const wasBoss = run.waveNumber >= run.totalWaves; // letzter (Boss-)Abschnitt
       this.gsm.dispatch({ type: 'SHOP_COMPLETE' });
       if (wasBoss) {
-        this.endRun(true);
+        this.onBossCleared(run.levelId);
         return;
       }
       this.go(SceneKey.Combat);
@@ -75,19 +75,22 @@ export class RunCoordinator {
     });
   }
 
-  /** Run-Ende: bei Sieg garantierter Boss-Item-Drop, dann zurück ins Menü. */
-  private endRun(victory: boolean): void {
-    if (victory) {
-      const seed = this.gsm.getState().run.seed;
-      this.gsm.dispatch({ type: 'GRANT_ITEM', item: rollBossItem(new Rng(seed ^ 0x5eed)) });
+  /** Boss besiegt: garantierter Item-Drop, dann nächstes Level oder Run-Sieg. */
+  private onBossCleared(levelId: string): void {
+    this.gsm.dispatch({ type: 'GRANT_ITEM', item: rollBossItem(new Rng(Rng.randomSeed())) });
+    const next = nextLevel(levelId);
+    if (next) {
+      this.gsm.dispatch({ type: 'ADVANCE_LEVEL', levelId: next.id, totalWaves: next.waves.length });
+      this.go(SceneKey.Combat);
+    } else {
+      this.gsm.dispatch({ type: 'END_RUN', victory: true });
+      this.go(SceneKey.Meta);
     }
-    this.gsm.dispatch({ type: 'END_RUN', victory });
-    this.go(SceneKey.Meta);
   }
 
   /** Startet einen frischen Run. totalWaves kommt datengetrieben aus dem Level. */
   startNewRun(levelId?: string): void {
-    const level = (levelId && LEVEL_REGISTRY[levelId]) || WORLD_1;
+    const level = getLevel(levelId);
     this.gsm.dispatch({
       type: 'START_RUN',
       levelId: level.id,

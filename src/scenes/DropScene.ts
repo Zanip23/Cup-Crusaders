@@ -6,7 +6,8 @@ import { getGsm } from '@/core/registry';
 import { eventBus } from '@/core/events/EventBus';
 import { GameEvent } from '@/core/events/GameEvents';
 import { selectBallsFromCombat } from '@/core/state/selectors';
-import { BOARD_BASIC } from '@/content/boards/basic';
+import { BOARD_BASIC, BOARD_REGISTRY } from '@/content/boards/basic';
+import { getLevel } from '@/content/levels';
 import { applyGateEffect, DropResolver } from '@/systems/drop/DropResolver';
 import { buildHeroStats } from '@/systems/combat/heroBuild';
 import { StatKey } from '@/core/stats/StatTypes';
@@ -48,7 +49,8 @@ export class DropScene extends Phaser.Scene {
     this.resetState();
 
     const gsm = getGsm(this);
-    this.board = BOARD_BASIC;
+    const level = getLevel(gsm.getState().run.levelId);
+    this.board = BOARD_REGISTRY[level.boardId] ?? BOARD_BASIC;
     // Munition = Kampf-Bälle + StartingBalls (Upgrade/Item, additiv vor Drop-Start).
     const startingBalls = buildHeroStats(gsm.getState().run, gsm.getState().meta).get(
       StatKey.StartingBalls,

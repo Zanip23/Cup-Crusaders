@@ -159,6 +159,20 @@ export function reducer(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'ADVANCE_LEVEL':
+      // Nächstes Level im selben Run: Upgrades bleiben, Welle/Transfer zurücksetzen.
+      return {
+        ...state,
+        run: {
+          ...state.run,
+          phase: 'combat',
+          levelId: action.levelId,
+          totalWaves: action.totalWaves,
+          waveNumber: 1,
+          transfer: { ballsFromCombat: 0, ballsFromDrop: 0 },
+        },
+      };
+
     case 'END_RUN': {
       const gold = action.victory ? runRewardGold(state.run.totalWaves, true) : 0;
       // waveNumber wurde durch SHOP_COMPLETE bereits über die Bosswelle erhöht →

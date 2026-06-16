@@ -1,19 +1,33 @@
-// Welt 1 „Waldpfad" — 15 Wellen (14 Normal + Boss), docs/12.
-// M2 nutzt nur Mug Gremlin + Brigand Lord; Anzahl steigt moderat (snappy Fights).
+// Welt 1 „Waldpfad" — 15 Wellen (14 + Boss), docs/12. Komposition steigt:
+// nur Gremlins → gemischte Normals → +Elite → Boss.
 
-import type { LevelDef, WaveDef } from '@/types/content';
+import type { LevelDef, SpawnEntry, WaveDef } from '@/types/content';
 
 const TOTAL_WAVES = 15;
 
+function wave(id: string, spawns: SpawnEntry[], isBoss = false): WaveDef {
+  return { id, spawns, isBoss };
+}
+
 function buildWaves(): WaveDef[] {
-  const waves: WaveDef[] = [];
+  const w: WaveDef[] = [];
   for (let n = 1; n <= TOTAL_WAVES - 1; n++) {
-    // Anzahl wächst von 2 bis ~6, gedeckelt für lesbare Rundenkämpfe.
-    const count = Math.min(2 + Math.floor(n / 2), 6);
-    waves.push({ id: `w1_wave_${n}`, spawns: [{ enemyId: 'mug_gremlin', count }] });
+    const spawns: SpawnEntry[] = [];
+    if (n <= 4) {
+      spawns.push({ enemyId: 'mug_gremlin', count: 1 + n });
+    } else if (n <= 9) {
+      spawns.push({ enemyId: 'mug_gremlin', count: 2 });
+      spawns.push({ enemyId: n % 2 === 0 ? 'shambler' : 'bone_archer', count: 1 + Math.floor((n - 5) / 2) });
+    } else {
+      // Druckphase: 1 Elite + Normals (docs/12 Wellen 10–14).
+      spawns.push({ enemyId: 'tomb_knight', count: n >= 13 ? 2 : 1 });
+      spawns.push({ enemyId: 'mug_gremlin', count: 2 });
+      spawns.push({ enemyId: 'bone_archer', count: 1 });
+    }
+    w.push(wave(`w1_wave_${n}`, spawns));
   }
-  waves.push({ id: 'w1_boss', spawns: [{ enemyId: 'brigand_lord', count: 1 }], isBoss: true });
-  return waves;
+  w.push(wave('w1_boss', [{ enemyId: 'brigand_lord', count: 1 }], true));
+  return w;
 }
 
 export const WORLD_1: LevelDef = {
@@ -24,8 +38,4 @@ export const WORLD_1: LevelDef = {
   boardId: 'board_basic',
   dropCadence: 'everyWave',
   scalingProfileId: 'standard',
-};
-
-export const LEVEL_REGISTRY: Record<string, LevelDef> = {
-  [WORLD_1.id]: WORLD_1,
 };

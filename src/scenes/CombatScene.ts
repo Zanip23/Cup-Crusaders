@@ -11,7 +11,7 @@ import { Rng } from '@/core/rng/Rng';
 import { CombatSystem } from '@/systems/combat/CombatSystem';
 import { buildHeroStats } from '@/systems/combat/heroBuild';
 import { buildWave, isBossWave } from '@/systems/WaveSpawner';
-import { WORLD_1 } from '@/content/waves/world-1';
+import { getLevel } from '@/content/levels';
 import { FLETCHER } from '@/content/heroes/fletcher';
 import type { EnemyInstance, HeroTurnResult, EnemyTurnResult } from '@/systems/combat/types';
 
@@ -54,15 +54,16 @@ export class CombatScene extends Phaser.Scene {
     const gsm = getGsm(this);
     const waveNumber = gsm.getState().run.waveNumber;
     const seed = gsm.getState().run.seed;
-    const boss = isBossWave(WORLD_1, waveNumber);
+    const level = getLevel(gsm.getState().run.levelId);
+    const boss = isBossWave(level, waveNumber);
 
-    new TopBar(this, 'KAMPF (Auto-Battler)', (g) => `🏐 ${selectBallsFromCombat(g.getState())}`);
+    new TopBar(this, `KAMPF · ${level.name}`, (g) => `🏐 ${selectBallsFromCombat(g.getState())}`);
 
     // Held-StatEngine aus Basis + Meta (Items/Skills) + Run-Upgrades.
     const hero = buildHeroStats(gsm.getState().run, gsm.getState().meta);
     this.heroMaxHp = hero.get(StatKey.MaxHp);
 
-    const enemies = buildWave(WORLD_1, waveNumber);
+    const enemies = buildWave(level, waveNumber);
     // MVP-Recovery: Held startet jede Welle voll geheilt. Persistenter HP-Verschleiß
     // (Lifesteal/Shop-Heals als Erholung) ist ein späterer Balancing-Hebel (M4).
     const startHp = this.heroMaxHp;
