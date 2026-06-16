@@ -29,6 +29,11 @@ export class ShopScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(COLORS.shop);
     new TopBar(this, 'SHOP (Upgrades)', (g) => `Währung: ${selectCurrency(g.getState())}`);
 
+    // Instanz-Status zuruecksetzen: Phaser verwendet Szenen-Instanzen ueber
+    // scene.start() hinweg wieder, Klassenfelder werden NICHT neu initialisiert.
+    this.boughtIds = new Set();
+    this.cardObjects = [];
+
     // 3 statische Platzhalter-Karten (in M4 gewichtet aus dem Pool gezogen).
     this.cards = [
       { id: 'upg_multishot', name: 'Mehrfachschuss', cost: 40 },
