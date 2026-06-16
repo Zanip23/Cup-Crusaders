@@ -34,7 +34,8 @@ const DRIP_INTERVAL_MS = 22;
 const BALLS_PER_DRIP = 2; // mehrere Bälle pro Tick → dichter Strom (Masse)
 const MAX_BONUS_BALLS_PER_GATE = 6; // höhere Multiplikatoren (x8) wirken spürbar
 const STRONG_GATE_THRESHOLD = 3;
-const SPIN_TIMEOUT_MS = 18000; // Timeout-Sicherung: Phase endet garantiert
+const SPIN_TIMEOUT_MS = 12000; // harte Timeout-Sicherung: Phase endet garantiert
+const IDLE_END_MS = 2000; // füllt sich der Becher ~2s nicht mehr → Phase beenden
 const CUP_Y = 180; // beweglicher Ausschütt-Becher (oben)
 const CATCHER_Y = GAME_HEIGHT - 150; // fester Fang-Becher (unten)
 const LOST_Y = GAME_HEIGHT - 40; // unter dem Trichter durchgerutscht → verloren
@@ -56,6 +57,7 @@ export class DropScene extends Phaser.Scene {
   private speedIndex = 0;
   private lastFxTotal = 0; // gedrosseltes Catch-FX: zeigt „+N" pro Burst
   private lastFxAt = 0;
+  private lastProgressAt = 0; // letzter Fang/Spawn — für das Idle-Phasenende
   private ammo = 0;
   private spawned = 0;
   private releasing = false;
@@ -106,8 +108,8 @@ export class DropScene extends Phaser.Scene {
     this.setupKeyboard();
     this.registerCollisions();
 
-    // Periodischer End-Check + Off-Screen-Despawn.
-    this.time.addEvent({ delay: 400, loop: true, callback: () => this.sweep() });
+    // Periodischer End-Check + Off-Screen-Despawn (häufig genug fürs Idle-Ende).
+    this.time.addEvent({ delay: 200, loop: true, callback: () => this.sweep() });
 
     // Matter-World-Handler bei Szenen-Shutdown abmelden. Die per-Scene-Matter-World
     // wird beim Shutdown ohnehin verworfen (this.matter.world ist dann ggf. null) →
@@ -126,6 +128,7 @@ export class DropScene extends Phaser.Scene {
     this.speedIndex = 0;
     this.lastFxTotal = 0;
     this.lastFxAt = 0;
+    this.lastProgressAt = 0;
     this.active.clear();
     this.fillBalls.length = 0;
   }
@@ -458,6 +461,7 @@ export class DropScene extends Phaser.Scene {
       return;
     }
     this.releasing = true;
+    this.lastProgressAt = this.time.now;
     this.cup.disableInteractive();
     this.cupHintText?.setText('Ausschütten läuft …');
     this.playCupReleaseFeedback();
@@ -480,6 +484,7 @@ export class DropScene extends Phaser.Scene {
         return;
       }
       this.spawned += 1;
+      this.lastProgressAt = this.time.now;
       this.updateCupAmmo(this.ammo - this.spawned);
       this.spawnBallFromCup();
     }
@@ -673,6 +678,7 @@ export class DropScene extends Phaser.Scene {
     const x = go.x;
     const y = go.y;
     this.resolver.collect(go.getData('value') as number, 1);
+    this.lastProgressAt = this.time.now;
     this.despawn(go);
     this.addFillBall();
 
@@ -746,6 +752,13 @@ export class DropScene extends Phaser.Scene {
         this.resolver.collectLost(0);
         this.despawn(go);
       }
+    }
+    // Idle-Ende: Alles ausgeschüttet und der Becher füllt sich seit IDLE_END_MS
+    // nicht mehr (festhängende/herumspringende Bälle) → Phase jetzt beenden,
+    // statt bis zum harten Timeout zu warten.
+    if (this.releasing && this.allSpawned && this.time.now - this.lastProgressAt > IDLE_END_MS) {
+      this.forceEnd();
+      return;
     }
     this.checkEnd();
   }
