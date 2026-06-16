@@ -11,7 +11,7 @@ import { getLevel } from '@/content/levels';
 import { DropResolver } from '@/systems/drop/DropResolver';
 import { buildHeroStats } from '@/systems/combat/heroBuild';
 import { StatKey } from '@/core/stats/StatTypes';
-import type { BoardDef } from '@/types/content';
+import type { BoardDef, BoardMotionDef } from '@/types/content';
 import {
   DROP_COLORS,
   gateColor,
@@ -29,6 +29,13 @@ import { floatingContribution, playGateFx, playStreamParticle } from '@/scenes/d
 // summiert nur tatsächliche Ergebnisse — kein Steering.
 
 type MatterBody = MatterJS.BodyType & { gameObject?: Phaser.GameObjects.Arc | null };
+type MovingBoardElement = {
+  body: MatterJS.BodyType;
+  visual: Phaser.GameObjects.Components.Transform;
+  baseX: number;
+  baseY: number;
+  motion: BoardMotionDef;
+};
 const BALL_RADIUS = 7;
 const DRIP_INTERVAL_MS = 22;
 const BALLS_PER_DRIP = 2; // mehrere Bälle pro Tick → dichter Strom (Masse)
@@ -74,6 +81,7 @@ export class DropScene extends Phaser.Scene {
   private cupWasDragged = false;
   private cupDisplayedAmmo = 0;
   private collisionHandler?: (e: Phaser.Physics.Matter.Events.CollisionStartEvent) => void;
+  private readonly movingBoardElements: MovingBoardElement[] = [];
 
   constructor() {
     // Matter nur in dieser Szene aktiv (docs/01) — per-Scene-Physics-Config.
@@ -136,10 +144,12 @@ export class DropScene extends Phaser.Scene {
     this.allSpawnedAt = 0;
     this.active.clear();
     this.fillBalls.length = 0;
+    this.movingBoardElements.length = 0;
   }
 
   // Phaser-Frame-Loop: Live-Ballzähler oben aktualisieren (Bälle im Spiel).
   update(): void {
+    this.updateBoardMotion();
     if (this.finished || !this.releasing) return;
     this.topBar.refresh();
   }
@@ -156,8 +166,14 @@ export class DropScene extends Phaser.Scene {
     this.matter.world.engine.timing.timeScale = 1;
     this.time.timeScale = 1;
     this.tweens.timeScale = 1;
-    this.speedButton = createButton(this, GAME_WIDTH - 70, 150, this.speedLabel(), () =>
-      this.cycleSpeed(), { fill: 0x24344f, width: 108, height: 46 });
+    this.speedButton = createButton(
+      this,
+      GAME_WIDTH - 70,
+      150,
+      this.speedLabel(),
+      () => this.cycleSpeed(),
+      { fill: 0x24344f, width: 108, height: 46 },
+    );
     this.speedButton.setAlpha(0.92).setDepth(40);
   }
 
@@ -220,17 +236,18 @@ export class DropScene extends Phaser.Scene {
 
     this.board.blockers?.forEach((blocker) => {
       const angle = Phaser.Math.DegToRad(blocker.angle ?? 0);
-      m.add.rectangle(blocker.x, blocker.y, blocker.w, blocker.h, {
+      const body = m.add.rectangle(blocker.x, blocker.y, blocker.w, blocker.h, {
         isStatic: true,
         angle,
         restitution: this.board.defaultRestitution * 0.85,
         label: 'blocker',
       });
-      this.add
+      const visual = this.add
         .rectangle(blocker.x, blocker.y, blocker.w, blocker.h, blocker.color ?? 0xff6b6b, 0.9)
         .setStrokeStyle(3, 0xffffff, 0.65)
         .setRotation(angle)
         .setDepth(6);
+      this.trackBoardMotion(body, visual, blocker.x, blocker.y, blocker.motion);
     });
 
     this.board.bumpers?.forEach((bumper) => {
@@ -254,60 +271,125 @@ export class DropScene extends Phaser.Scene {
     // Plattformen sind breite Multiplikator-/Bonus-Zonen auf mehreren Höhen.
     this.board.platforms?.forEach((platform, i) => {
       const angle = Phaser.Math.DegToRad(platform.angle ?? 0);
-      m.add.rectangle(platform.x, platform.y, platform.w, platform.h, {
+      const body = m.add.rectangle(platform.x, platform.y, platform.w, platform.h, {
         isStatic: true,
         isSensor: true,
         angle,
         label: `platform:${i}`,
       });
-      this.add
-        .rectangle(
-          platform.x + 7,
-          platform.y + 8,
-          platform.w + 18,
-          platform.h + 12,
-          DROP_COLORS.pinShadow,
-          0.42,
-        )
-        .setRotation(angle)
-        .setDepth(6);
-      this.add
-        .rectangle(
-          platform.x,
-          platform.y,
-          platform.w,
-          platform.h,
-          platform.color ?? gateColor(platform.label),
-          0.94,
-        )
-        .setStrokeStyle(5, 0xffffff, 0.86)
-        .setRotation(angle)
-        .setDepth(7);
-      renderBoardLabel(this, platform.x, platform.y, platform.label, '28px');
+      const visual = this.add.container(platform.x, platform.y);
+      visual.add(
+        this.add
+          .rectangle(
+            platform.x + 7,
+            platform.y + 8,
+            platform.w + 18,
+            platform.h + 12,
+            DROP_COLORS.pinShadow,
+            0.42,
+          )
+          .setPosition(7, 8)
+          .setRotation(angle)
+          .setDepth(6),
+      );
+      visual.add(
+        this.add
+          .rectangle(
+            0,
+            0,
+            platform.w,
+            platform.h,
+            platform.color ?? gateColor(platform.label),
+            0.94,
+          )
+          .setStrokeStyle(5, 0xffffff, 0.86)
+          .setRotation(angle)
+          .setDepth(7),
+      );
+      visual.add(renderBoardLabel(this, 0, 0, platform.label, '28px'));
+      this.trackBoardMotion(body, visual, platform.x, platform.y, platform.motion);
     });
 
     this.board.boosters?.forEach((booster, i) => {
       const angle = Phaser.Math.DegToRad(booster.angle ?? 0);
-      m.add.rectangle(booster.x, booster.y, booster.w, booster.h, {
+      const body = m.add.rectangle(booster.x, booster.y, booster.w, booster.h, {
         isStatic: true,
         isSensor: true,
         angle,
         label: `booster:${i}`,
       });
-      this.add
-        .rectangle(booster.x, booster.y, booster.w, booster.h, booster.color ?? 0xff4fd8, 0.9)
-        .setStrokeStyle(5, 0xffffff, 0.86)
-        .setRotation(angle)
-        .setDepth(7);
-      renderBoardLabel(this, booster.x, booster.y, booster.label, '20px');
+      const visual = this.add.container(booster.x, booster.y);
+      visual.add(
+        this.add
+          .rectangle(0, 0, booster.w, booster.h, booster.color ?? 0xff4fd8, 0.9)
+          .setStrokeStyle(5, 0xffffff, 0.86)
+          .setRotation(angle)
+          .setDepth(7),
+      );
+      visual.add(renderBoardLabel(this, 0, 0, booster.label, '20px'));
+      this.trackBoardMotion(body, visual, booster.x, booster.y, booster.motion);
     });
 
     // Tore (Sensoren) als breite, farbige Multiplikator-Balken.
     this.board.gates.forEach((g, i) => {
-      m.add.rectangle(g.x, g.y, g.w, g.h, { isStatic: true, isSensor: true, label: `gate:${i}` });
-      renderGate(this, g);
+      const body = m.add.rectangle(g.x, g.y, g.w, g.h, {
+        isStatic: true,
+        isSensor: true,
+        label: `gate:${i}`,
+      });
+      const visual = renderGate(this, g);
+      this.trackBoardMotion(body, visual, g.x, g.y, g.motion);
     });
+  }
 
+  private trackBoardMotion(
+    body: MatterJS.BodyType,
+    visual: Phaser.GameObjects.Components.Transform,
+    baseX: number,
+    baseY: number,
+    motion?: BoardMotionDef,
+  ): void {
+    if (!motion) return;
+    this.movingBoardElements.push({ body, visual, baseX, baseY, motion });
+  }
+
+  private updateBoardMotion(): void {
+    if (this.movingBoardElements.length === 0) return;
+    for (const element of this.movingBoardElements) {
+      const next = this.resolveMotionPosition(element.baseX, element.baseY, element.motion);
+      this.matter.body.setPosition(element.body, next);
+      element.visual.setPosition(next.x, next.y);
+    }
+  }
+
+  private resolveMotionPosition(
+    baseX: number,
+    baseY: number,
+    motion: BoardMotionDef,
+  ): Phaser.Types.Math.Vector2Like {
+    const duration = Math.max(1, motion.durationMs);
+    const phaseMs = this.time.now + (motion.phaseOffsetMs ?? 0);
+    const t = Phaser.Math.Wrap(phaseMs, 0, duration) / duration;
+
+    if (motion.type === 'horizontal') {
+      const dx = Math.sin(t * Math.PI * 2) * motion.amplitude;
+      return { x: baseX + dx, y: baseY };
+    }
+
+    if (motion.type === 'vertical') {
+      const dy = Math.sin(t * Math.PI * 2) * motion.amplitude;
+      return { x: baseX, y: baseY + dy };
+    }
+
+    if (motion.type === 'pingpong') {
+      const normalized = t < 0.5 ? t * 2 : (1 - t) * 2;
+      const dx = Phaser.Math.Linear(-motion.amplitude, motion.amplitude, normalized);
+      return { x: baseX + dx, y: baseY };
+    }
+
+    // Pulse ist im Schema reserviert, wird aber erst später als reiner visueller
+    // Effekt umgesetzt. Bis dahin bleibt die Physik-Position unverändert.
+    return { x: baseX, y: baseY };
   }
 
   // Solide Rampe aus zwei Endpunkten (Länge/Winkel berechnet) + Holz-Optik.
@@ -651,7 +733,11 @@ export class DropScene extends Phaser.Scene {
     for (let i = 0; i < spawnCount; i += 1) {
       const side = i % 2 === 0 ? -1 : 1;
       const spread = 10 + Math.floor(i / 2) * 7;
-      const x = Phaser.Math.Clamp(sourceBall.x + side * spread, BALL_RADIUS, GAME_WIDTH - BALL_RADIUS);
+      const x = Phaser.Math.Clamp(
+        sourceBall.x + side * spread,
+        BALL_RADIUS,
+        GAME_WIDTH - BALL_RADIUS,
+      );
       const y = sourceBall.y - Phaser.Math.Between(4, 12);
       const ball = this.add.circle(x, y, BALL_RADIUS, 0xffffff).setDepth(sourceBall.depth);
       this.initBall(ball, x, y, inheritedGates);
@@ -695,7 +781,14 @@ export class DropScene extends Phaser.Scene {
       body.velocity.x + Phaser.Math.FloatBetween(-2.2, 2.2),
       -Phaser.Math.FloatBetween(8, 10),
     );
-    this.tweens.add({ targets: go, alpha: 0.5, scaleX: 1.4, scaleY: 0.7, duration: 70, yoyo: true });
+    this.tweens.add({
+      targets: go,
+      alpha: 0.5,
+      scaleX: 1.4,
+      scaleY: 0.7,
+      duration: 70,
+      yoyo: true,
+    });
   }
 
   private setBallVelocity(go: Phaser.GameObjects.Arc, vx: number, vy: number): void {
@@ -724,7 +817,8 @@ export class DropScene extends Phaser.Scene {
       const gained = total - this.lastFxTotal;
       this.lastFxTotal = total;
       this.lastFxAt = now;
-      if (gained > 0) floatingContribution(this, x, y - 40, gained, gained >= 8 ? 'good' : 'normal');
+      if (gained > 0)
+        floatingContribution(this, x, y - 40, gained, gained >= 8 ? 'good' : 'normal');
       this.bumpCatcher();
       this.playOptionalSound('drop-catch');
     }
@@ -792,11 +886,7 @@ export class DropScene extends Phaser.Scene {
     // Becher füllt sich nicht mehr: Ist alles ausgeschüttet, hat der Becher schon
     // Bälle (≥1 Treffer) und kam seit NO_CATCH_END_MS keiner mehr dazu → Phase
     // beenden. Genau das Gefühl „alle Bälle sind drin, jetzt weiter".
-    if (
-      this.allSpawned &&
-      this.resolver.total() > 0 &&
-      now - this.lastCatchAt > NO_CATCH_END_MS
-    ) {
+    if (this.allSpawned && this.resolver.total() > 0 && now - this.lastCatchAt > NO_CATCH_END_MS) {
       this.forceEnd();
       return;
     }
@@ -810,7 +900,10 @@ export class DropScene extends Phaser.Scene {
       // Festhängend? Bewegt sich der Ball seit STUCK_MS um < STUCK_DIST, gilt er als
       // verklemmt (auf einem Pfosten/in einer Ecke) und wird entfernt — so endet die
       // Phase zügig, statt auf den harten Timeout zu warten.
-      const moved = Math.hypot(go.x - (go.getData('mx') as number), go.y - (go.getData('my') as number));
+      const moved = Math.hypot(
+        go.x - (go.getData('mx') as number),
+        go.y - (go.getData('my') as number),
+      );
       if (moved > STUCK_DIST) {
         go.setData('mx', go.x);
         go.setData('my', go.y);
