@@ -143,7 +143,7 @@ export interface GateDef {
   y: number;
   w: number;
   h: number;
-  effect: Effect; // gateMultiply | gateAdd
+  effect: Effect; // gateMultiply | gateAdd | gateMystery
   label: string;
   color?: number;
   motion?: BoardMotionDef;

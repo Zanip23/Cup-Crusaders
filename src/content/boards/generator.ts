@@ -3,6 +3,7 @@
 // Funnel-Zonen frei und nutzt bewusste Zonen/Pattern statt komplettem Zufall.
 
 import { Rng } from '@/core/rng/Rng';
+import { createMysteryEffect, mysteryPoolIdForChallenge } from '@/content/boards/mysteryPools';
 import { evaluateBoardPlayability } from '@/systems/drop/BoardPlayability';
 import type {
   BinDef,
@@ -427,6 +428,10 @@ function effectFor(kind: 'multiply' | 'add', value: number) {
     : { type: 'gateAdd' as const, params: { amount: value } };
 }
 
+function mysteryEffectFor(challenge: number) {
+  return createMysteryEffect(mysteryPoolIdForChallenge(challenge));
+}
+
 export function buildBoardBudget(difficulty: number, wave: number, chapter: number): number {
   const challenge = scaledDifficulty(difficulty, wave);
   const chapterBonus = Math.max(0, chapter - 1) * 10;
@@ -482,12 +487,14 @@ function buildPatternObjects(
     const value = effectValue(slot.kind, challenge, rng, riskScore);
     if (!spendBudget(budget, gateCost(slot.kind, value))) continue;
     const prefix = slot.kind === 'multiply' ? 'x' : '+';
+    const useMystery = challenge >= 4 && riskScore >= 4.5 && rng.next() < 0.28;
     gates.push({
       ...zoneAwarePoint(slot, template.gateZones, rng, 18, 18),
       w: 76,
       h: 24,
-      label: `${prefix}${value}`,
-      effect: effectFor(slot.kind, value),
+      label: useMystery ? '???' : `${prefix}${value}`,
+      effect: useMystery ? mysteryEffectFor(challenge) : effectFor(slot.kind, value),
+      color: useMystery ? 0x9a5cff : undefined,
     });
   }
 
@@ -504,15 +511,16 @@ function buildPatternObjects(
     const value = effectValue(slot.labelKind, challenge, rng, riskScore);
     if (!spendBudget(budget, platformCost(slot.labelKind, value, slot.w))) continue;
     const prefix = slot.labelKind === 'multiply' ? 'x' : '+';
+    const useMystery = challenge >= 5 && riskScore >= 4 && rng.next() < 0.22;
     platforms.push({
       x: Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 20)),
       y: clamp(slot.y + jitter(rng, 16), SAFE_TOP_Y, SAFE_BOTTOM_Y),
       w: slot.w,
       h: 26,
       angle: jitter(rng, 5),
-      label: `${prefix}${value}`,
-      effect: effectFor(slot.labelKind, value),
-      color: slot.labelKind === 'multiply' ? 0xf4c430 : 0x36d66b,
+      label: useMystery ? '???' : `${prefix}${value}`,
+      effect: useMystery ? mysteryEffectFor(challenge) : effectFor(slot.labelKind, value),
+      color: useMystery ? 0x9a5cff : slot.labelKind === 'multiply' ? 0xf4c430 : 0x36d66b,
     });
   }
 
