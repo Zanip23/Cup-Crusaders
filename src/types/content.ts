@@ -97,12 +97,20 @@ export interface WaveDef {
 
 export type DropCadence = 'everyWave' | 'levelEnd';
 
+export interface LevelBoardSelection {
+  mode: 'generated' | 'fixed';
+  /** Fallback oder festes Board aus BOARD_REGISTRY. */
+  boardId?: string;
+}
+
 export interface LevelDef {
   id: string;
   name: string;
   chapter: number;
   waves: WaveDef[];
-  boardId: string;
+  /** Legacy/Fallback: festes Board aus BOARD_REGISTRY, wenn kein Generator genutzt wird. */
+  boardId?: string;
+  boardSelection?: LevelBoardSelection;
   dropCadence: DropCadence;
   scalingProfileId: string;
 }

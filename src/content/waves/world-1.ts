@@ -17,7 +17,10 @@ function buildWaves(): WaveDef[] {
       spawns.push({ enemyId: 'mug_gremlin', count: 1 + n });
     } else if (n <= 9) {
       spawns.push({ enemyId: 'mug_gremlin', count: 2 });
-      spawns.push({ enemyId: n % 2 === 0 ? 'shambler' : 'bone_archer', count: 1 + Math.floor((n - 5) / 2) });
+      spawns.push({
+        enemyId: n % 2 === 0 ? 'shambler' : 'bone_archer',
+        count: 1 + Math.floor((n - 5) / 2),
+      });
     } else {
       // Druckphase: 1 Elite + Normals (docs/12 Wellen 10–14).
       spawns.push({ enemyId: 'tomb_knight', count: n >= 13 ? 2 : 1 });
@@ -36,6 +39,7 @@ export const WORLD_1: LevelDef = {
   chapter: 1,
   waves: buildWaves(),
   boardId: 'board_basic',
+  boardSelection: { mode: 'generated', boardId: 'board_basic' },
   dropCadence: 'everyWave',
   scalingProfileId: 'standard',
 };

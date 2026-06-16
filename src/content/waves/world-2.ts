@@ -31,6 +31,7 @@ export const WORLD_2: LevelDef = {
   chapter: 2,
   waves: buildWaves(),
   boardId: 'board_dense',
+  boardSelection: { mode: 'generated', boardId: 'board_dense' },
   dropCadence: 'everyWave',
   scalingProfileId: 'standard',
 };
