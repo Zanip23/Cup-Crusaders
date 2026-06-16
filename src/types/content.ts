@@ -137,6 +137,60 @@ export interface GateDef {
   h: number;
   effect: Effect; // gateMultiply | gateAdd
   label: string;
+  color?: number;
+}
+
+export interface BoardBumperDef {
+  x: number;
+  y: number;
+  radius: number;
+  label?: string;
+  effect?: Effect;
+  color?: number;
+}
+
+export interface BoardRampDef {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  angle: number;
+  label?: string;
+  effect?: Effect;
+  color?: number;
+}
+
+export interface BoardPlatformDef {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  angle?: number;
+  label: string;
+  effect: Effect;
+  color?: number;
+}
+
+export interface BoardBoosterDef {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  angle?: number;
+  label: string;
+  effect?: Effect;
+  color?: number;
+}
+
+export interface BoardBlockerDef {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  angle?: number;
+  label?: string;
+  effect?: Effect;
+  color?: number;
 }
 
 export interface BinDef {
@@ -156,5 +210,10 @@ export interface BoardDef {
   pegs: PegDef[];
   gates: GateDef[];
   bins: BinDef[];
+  bumpers?: BoardBumperDef[];
+  ramps?: BoardRampDef[];
+  platforms?: BoardPlatformDef[];
+  boosters?: BoardBoosterDef[];
+  blockers?: BoardBlockerDef[];
   maxConcurrentBalls: number; // Performance-Cap (docs/05)
 }

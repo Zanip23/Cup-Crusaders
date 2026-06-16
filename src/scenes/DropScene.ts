@@ -57,7 +57,10 @@ export class DropScene extends Phaser.Scene {
 
   constructor() {
     // Matter nur in dieser Szene aktiv (docs/01) — per-Scene-Physics-Config.
-    super({ key: 'Drop', physics: { default: 'matter', matter: { gravity: { x: 0, y: 1 }, debug: false } } });
+    super({
+      key: 'Drop',
+      physics: { default: 'matter', matter: { gravity: { x: 0, y: 1 }, debug: false } },
+    });
   }
 
   create(): void {
@@ -114,7 +117,10 @@ export class DropScene extends Phaser.Scene {
 
     // Wände + Floor (statisch, nicht-Sensor).
     m.add.rectangle(-10, GAME_HEIGHT / 2, 20, GAME_HEIGHT, { isStatic: true, label: 'wall' });
-    m.add.rectangle(GAME_WIDTH + 10, GAME_HEIGHT / 2, 20, GAME_HEIGHT, { isStatic: true, label: 'wall' });
+    m.add.rectangle(GAME_WIDTH + 10, GAME_HEIGHT / 2, 20, GAME_HEIGHT, {
+      isStatic: true,
+      label: 'wall',
+    });
     m.add.rectangle(CENTER_X, GAME_HEIGHT - 30, GAME_WIDTH, 20, { isStatic: true, label: 'wall' });
 
     // Pegs als glänzende Pins.
@@ -124,19 +130,132 @@ export class DropScene extends Phaser.Scene {
         restitution: this.board.defaultRestitution,
         label: 'peg',
       });
-      this.add.circle(peg.x + 4, peg.y + 6, peg.radius + 8, DROP_COLORS.pinShadow, 0.45).setDepth(2);
+      this.add
+        .circle(peg.x + 4, peg.y + 6, peg.radius + 8, DROP_COLORS.pinShadow, 0.45)
+        .setDepth(2);
       this.add.circle(peg.x, peg.y, peg.radius + 5, DROP_COLORS.pinOuter, 0.92).setDepth(3);
       this.add.circle(peg.x, peg.y, peg.radius + 1, DROP_COLORS.pinCore, 0.98).setDepth(4);
-      this.add.circle(peg.x - 4, peg.y - 4, Math.max(3, peg.radius * 0.38), 0xffffff, 0.95).setDepth(5);
+      this.add
+        .circle(peg.x - 4, peg.y - 4, Math.max(3, peg.radius * 0.38), 0xffffff, 0.95)
+        .setDepth(5);
     }
+
+    // Moderne Board-Elemente sind optional, damit ältere Boards ohne neue Felder
+    // weiterhin funktionieren.
+    this.board.ramps?.forEach((ramp) => {
+      const angle = Phaser.Math.DegToRad(ramp.angle);
+      m.add.rectangle(ramp.x, ramp.y, ramp.w, ramp.h, {
+        isStatic: true,
+        angle,
+        restitution: this.board.defaultRestitution,
+        label: 'ramp',
+      });
+      this.add
+        .rectangle(ramp.x, ramp.y, ramp.w, ramp.h, ramp.color ?? DROP_COLORS.pinOuter, 0.88)
+        .setStrokeStyle(3, 0xffffff, 0.72)
+        .setRotation(angle)
+        .setDepth(6);
+      if (ramp.label) this.addBoardLabel(ramp.x, ramp.y, ramp.label, '20px');
+    });
+
+    this.board.blockers?.forEach((blocker) => {
+      const angle = Phaser.Math.DegToRad(blocker.angle ?? 0);
+      m.add.rectangle(blocker.x, blocker.y, blocker.w, blocker.h, {
+        isStatic: true,
+        angle,
+        restitution: this.board.defaultRestitution * 0.85,
+        label: 'blocker',
+      });
+      this.add
+        .rectangle(blocker.x, blocker.y, blocker.w, blocker.h, blocker.color ?? 0xff6b6b, 0.9)
+        .setStrokeStyle(3, 0xffffff, 0.65)
+        .setRotation(angle)
+        .setDepth(6);
+    });
+
+    this.board.bumpers?.forEach((bumper) => {
+      m.add.circle(bumper.x, bumper.y, bumper.radius, {
+        isStatic: true,
+        restitution: Math.max(1.05, this.board.defaultRestitution + 0.75),
+        label: 'bumper',
+      });
+      this.add
+        .circle(bumper.x + 5, bumper.y + 7, bumper.radius + 7, DROP_COLORS.pinShadow, 0.42)
+        .setDepth(6);
+      this.add
+        .circle(bumper.x, bumper.y, bumper.radius + 4, bumper.color ?? DROP_COLORS.blueGate, 0.94)
+        .setStrokeStyle(5, 0xffffff, 0.88)
+        .setDepth(7);
+      this.add
+        .circle(bumper.x - 7, bumper.y - 7, Math.max(5, bumper.radius * 0.25), 0xffffff, 0.5)
+        .setDepth(8);
+    });
+
+    // Plattformen sind breite Multiplikator-/Bonus-Zonen auf mehreren Höhen.
+    this.board.platforms?.forEach((platform, i) => {
+      const angle = Phaser.Math.DegToRad(platform.angle ?? 0);
+      m.add.rectangle(platform.x, platform.y, platform.w, platform.h, {
+        isStatic: true,
+        isSensor: true,
+        angle,
+        label: `platform:${i}`,
+      });
+      this.add
+        .rectangle(
+          platform.x + 7,
+          platform.y + 8,
+          platform.w + 18,
+          platform.h + 12,
+          DROP_COLORS.pinShadow,
+          0.42,
+        )
+        .setRotation(angle)
+        .setDepth(6);
+      this.add
+        .rectangle(
+          platform.x,
+          platform.y,
+          platform.w,
+          platform.h,
+          platform.color ?? this.gateColor(platform.label),
+          0.94,
+        )
+        .setStrokeStyle(5, 0xffffff, 0.86)
+        .setRotation(angle)
+        .setDepth(7);
+      this.addBoardLabel(platform.x, platform.y, platform.label, '28px');
+    });
+
+    this.board.boosters?.forEach((booster, i) => {
+      const angle = Phaser.Math.DegToRad(booster.angle ?? 0);
+      m.add.rectangle(booster.x, booster.y, booster.w, booster.h, {
+        isStatic: true,
+        isSensor: true,
+        angle,
+        label: `booster:${i}`,
+      });
+      this.add
+        .rectangle(booster.x, booster.y, booster.w, booster.h, booster.color ?? 0xff4fd8, 0.9)
+        .setStrokeStyle(5, 0xffffff, 0.86)
+        .setRotation(angle)
+        .setDepth(7);
+      this.addBoardLabel(booster.x, booster.y, booster.label, '20px');
+    });
 
     // Tore (Sensoren) als breite, farbige Multiplikator-Balken.
     this.board.gates.forEach((g, i) => {
       m.add.rectangle(g.x, g.y, g.w, g.h, { isStatic: true, isSensor: true, label: `gate:${i}` });
-      const fill = this.gateColor(g.label);
-      this.add.rectangle(g.x + 7, g.y + 8, g.w + 18, g.h + 12, DROP_COLORS.pinShadow, 0.42).setDepth(6);
-      this.add.rectangle(g.x, g.y, g.w + 12, g.h + 10, fill, 0.95).setStrokeStyle(6, 0xffffff, 0.9).setDepth(7);
-      this.add.rectangle(g.x, g.y - g.h * 0.2, g.w - 10, Math.max(8, g.h * 0.24), 0xffffff, 0.24).setDepth(8);
+      const fill = g.color ?? this.gateColor(g.label);
+      this.add
+        .rectangle(g.x + 7, g.y + 8, g.w + 18, g.h + 12, DROP_COLORS.pinShadow, 0.42)
+        .setDepth(6);
+      this.add
+        .rectangle(g.x, g.y, g.w + 12, g.h + 10, fill, 0.95)
+        .setStrokeStyle(6, 0xffffff, 0.9)
+        .setDepth(7);
+      this.add
+        .rectangle(g.x, g.y - g.h * 0.2, g.w - 10, Math.max(8, g.h * 0.24), 0xffffff, 0.24)
+        .setDepth(8);
       this.add
         .text(g.x, g.y + 1, g.label, {
           fontSize: '32px',
@@ -154,12 +273,21 @@ export class DropScene extends Phaser.Scene {
     const sensorY = binTop + 40;
     this.board.bins.forEach((b, i) => {
       const cx = b.x + b.w / 2;
-      m.add.rectangle(cx, sensorY, b.w - 6, 70, { isStatic: true, isSensor: true, label: `bin:${i}` });
+      m.add.rectangle(cx, sensorY, b.w - 6, 70, {
+        isStatic: true,
+        isSensor: true,
+        label: `bin:${i}`,
+      });
       const jackpot = b.multiplier >= 10;
       const fill = jackpot ? DROP_COLORS.yellowGate : DROP_COLORS.binFill;
       this.add.rectangle(cx + 6, sensorY + 8, b.w - 8, 104, 0x000000, 0.36).setDepth(6);
-      this.add.rectangle(cx, sensorY, b.w - 12, 98, fill, jackpot ? 0.88 : 0.82).setStrokeStyle(5, jackpot ? 0xffffff : DROP_COLORS.blueGate, 0.92).setDepth(7);
-      this.add.rectangle(cx, sensorY - 34, b.w - 24, 12, 0xffffff, jackpot ? 0.34 : 0.16).setDepth(8);
+      this.add
+        .rectangle(cx, sensorY, b.w - 12, 98, fill, jackpot ? 0.88 : 0.82)
+        .setStrokeStyle(5, jackpot ? 0xffffff : DROP_COLORS.blueGate, 0.92)
+        .setDepth(7);
+      this.add
+        .rectangle(cx, sensorY - 34, b.w - 24, 12, 0xffffff, jackpot ? 0.34 : 0.16)
+        .setDepth(8);
       this.add
         .text(cx, sensorY, b.label, {
           fontSize: jackpot ? '36px' : '28px',
@@ -180,7 +308,13 @@ export class DropScene extends Phaser.Scene {
 
   private buildStageBackground(): void {
     const bg = this.add.graphics().setDepth(-20);
-    bg.fillGradientStyle(DROP_COLORS.caveTop, DROP_COLORS.caveTop, DROP_COLORS.caveBottom, DROP_COLORS.caveBottom, 1);
+    bg.fillGradientStyle(
+      DROP_COLORS.caveTop,
+      DROP_COLORS.caveTop,
+      DROP_COLORS.caveBottom,
+      DROP_COLORS.caveBottom,
+      1,
+    );
     bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
     this.drawRockLayer(DROP_COLORS.rockBack, 0.42, 95, 0, -16);
@@ -210,13 +344,20 @@ export class DropScene extends Phaser.Scene {
     }
   }
 
-  private drawRockLayer(color: number, alpha: number, height: number, offset: number, depth: number): void {
+  private drawRockLayer(
+    color: number,
+    alpha: number,
+    height: number,
+    offset: number,
+    depth: number,
+  ): void {
     const g = this.add.graphics().setDepth(depth);
     g.fillStyle(color, alpha);
     g.beginPath();
     g.moveTo(0, GAME_HEIGHT);
     for (let x = 0; x <= GAME_WIDTH + 90; x += 90) {
-      const y = GAME_HEIGHT - height - Phaser.Math.Between(0, 90) - ((x + offset) % 180 === 0 ? 42 : 0);
+      const y =
+        GAME_HEIGHT - height - Phaser.Math.Between(0, 90) - ((x + offset) % 180 === 0 ? 42 : 0);
       g.lineTo(x, y);
     }
     g.lineTo(GAME_WIDTH, GAME_HEIGHT);
@@ -228,6 +369,19 @@ export class DropScene extends Phaser.Scene {
     if (label.includes('4')) return DROP_COLORS.blueGate;
     if (label.includes('3')) return DROP_COLORS.greenGate;
     return DROP_COLORS.yellowGate;
+  }
+
+  private addBoardLabel(x: number, y: number, label: string, fontSize: string): void {
+    this.add
+      .text(x, y + 1, label, {
+        fontSize,
+        color: '#ffffff',
+        fontStyle: 'bold',
+        stroke: '#182034',
+        strokeThickness: 5,
+      })
+      .setOrigin(0.5)
+      .setDepth(9);
   }
 
   private buildCup(): void {
@@ -278,14 +432,19 @@ export class DropScene extends Phaser.Scene {
         strokeThickness: 6,
       })
       .setOrigin(0.5);
-    this.cup = this.add.container(CENTER_X, CUP_Y, [shadow, body, rim, innerRim, shine, this.cupAmmoText]).setDepth(20);
+    this.cup = this.add
+      .container(CENTER_X, CUP_Y, [shadow, body, rim, innerRim, shine, this.cupAmmoText])
+      .setDepth(20);
     this.cup.setSize(124, 64);
     this.cup.setInteractive({ useHandCursor: true, draggable: true });
 
     // Drag (horizontal) ...
-    this.input.on('drag', (_p: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject, dragX: number) => {
-      if (obj === this.cup) this.cup.x = Phaser.Math.Clamp(dragX, 70, GAME_WIDTH - 70);
-    });
+    this.input.on(
+      'drag',
+      (_p: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject, dragX: number) => {
+        if (obj === this.cup) this.cup.x = Phaser.Math.Clamp(dragX, 70, GAME_WIDTH - 70);
+      },
+    );
     // ... und Tap auf den Becher = ausschütten (Alternative zur Drag-Bedienung).
     this.cup.on('pointerup', () => this.release());
   }
@@ -297,8 +456,16 @@ export class DropScene extends Phaser.Scene {
       width: 260,
       height: 64,
     });
-    createButton(this, 110, GAME_HEIGHT - 90, '◀', () => this.nudgeCup(-50), { fill: 0x444466, width: 90, height: 64 });
-    createButton(this, GAME_WIDTH - 110, GAME_HEIGHT - 90, '▶', () => this.nudgeCup(50), { fill: 0x444466, width: 90, height: 64 });
+    createButton(this, 110, GAME_HEIGHT - 90, '◀', () => this.nudgeCup(-50), {
+      fill: 0x444466,
+      width: 90,
+      height: 64,
+    });
+    createButton(this, GAME_WIDTH - 110, GAME_HEIGHT - 90, '▶', () => this.nudgeCup(50), {
+      fill: 0x444466,
+      width: 90,
+      height: 64,
+    });
   }
 
   private nudgeCup(dx: number): void {
@@ -346,7 +513,7 @@ export class DropScene extends Phaser.Scene {
     const x = this.cup.x + Phaser.Math.Between(-14, 14);
     const ball = this.add.circle(x, CUP_Y + 30, BALL_RADIUS, 0xffffff);
     ball.setData('value', 1);
-    ball.setData('gates', new Set<number>());
+    ball.setData('gates', new Set<string>());
     this.matter.add.gameObject(ball, {
       shape: { type: 'circle', radius: BALL_RADIUS },
       restitution: this.board.defaultRestitution,
@@ -375,22 +542,48 @@ export class DropScene extends Phaser.Scene {
         if (!ballBody) continue;
         const go = ballBody.gameObject;
         if (!go || !go.active) continue;
-        if (other.startsWith('gate:')) this.handleGate(go, Number(other.slice(5)));
+        if (other.startsWith('gate:'))
+          this.handleGate(
+            go,
+            `gate:${other.slice(5)}`,
+            this.board.gates[Number(other.slice(5))].effect,
+          );
+        else if (other.startsWith('platform:'))
+          this.handleGate(
+            go,
+            `platform:${other.slice(9)}`,
+            this.board.platforms?.[Number(other.slice(9))]?.effect,
+          );
+        else if (other.startsWith('booster:'))
+          this.handleBooster(go, ballBody, Number(other.slice(8)));
         else if (other.startsWith('bin:')) this.handleBin(go, Number(other.slice(4)));
       }
     };
     this.matter.world.on('collisionstart', this.collisionHandler);
   }
 
-  private handleGate(go: Phaser.GameObjects.Arc, index: number): void {
-    const passed = go.getData('gates') as Set<number>;
-    if (passed.has(index)) return; // pro Ball nur einmal
-    passed.add(index);
-    const gate = this.board.gates[index];
-    const value = applyGateEffect(go.getData('value') as number, gate.effect);
+  private handleGate(
+    go: Phaser.GameObjects.Arc,
+    id: string,
+    effect: BoardDef['gates'][number]['effect'] | undefined,
+  ): void {
+    if (!effect) return;
+    const passed = go.getData('gates') as Set<string>;
+    if (passed.has(id)) return; // pro Ball nur einmal pro Zone
+    passed.add(id);
+    const value = applyGateEffect(go.getData('value') as number, effect);
     go.setData('value', value);
     go.setFillStyle(value >= 10 ? 0xf4c430 : value >= 2 ? 0xffa726 : 0xffffff);
     this.tweens.add({ targets: go, scale: 1.5, duration: 90, yoyo: true });
+  }
+
+  private handleBooster(go: Phaser.GameObjects.Arc, body: MatterBody, index: number): void {
+    const booster = this.board.boosters?.[index];
+    if (!booster) return;
+    this.handleGate(go, `booster:${index}`, booster.effect);
+    body.velocity.x += Phaser.Math.FloatBetween(-2.4, 2.4);
+    body.velocity.y = Math.min(body.velocity.y, -7.5);
+    this.tweens.add({ targets: go, alpha: 0.45, duration: 60, yoyo: true });
   }
 
   private handleBin(go: Phaser.GameObjects.Arc, index: number): void {
@@ -421,7 +614,13 @@ export class DropScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setDepth(30);
-    this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 600, onComplete: () => t.destroy() });
+    this.tweens.add({
+      targets: t,
+      y: y - 40,
+      alpha: 0,
+      duration: 600,
+      onComplete: () => t.destroy(),
+    });
   }
 
   // ---- Phasenende --------------------------------------------------------
