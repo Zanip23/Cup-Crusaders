@@ -9,6 +9,7 @@ import { selectBallsFromCombat } from '@/core/state/selectors';
 import { BOARD_BASIC, BOARD_REGISTRY } from '@/content/boards/basic';
 import { getLevel } from '@/content/levels';
 import { DropResolver } from '@/systems/drop/DropResolver';
+import { pickMysteryEffect } from '@/content/boards/mysteryPools';
 import { buildHeroStats } from '@/systems/combat/heroBuild';
 import { StatKey } from '@/core/stats/StatTypes';
 import type { BoardDef, BoardMotionDef } from '@/types/content';
@@ -698,17 +699,35 @@ export class DropScene extends Phaser.Scene {
     passed.add(id);
     this.popBall(go);
 
-    if (effect.type === 'gateMultiply' || effect.type === 'gateMystery') {
-      const factor =
-        effect.type === 'gateMystery'
-          ? Phaser.Math.Between(
-              Math.floor(Number(effect.params.min ?? 2)),
-              Math.floor(Number(effect.params.max ?? 4)),
-            )
-          : Math.max(1, Math.floor(Number(effect.params.factor ?? 1)));
+    if (effect.type === 'gateMystery') {
+      const mystery = pickMysteryEffect(effect, () => Phaser.Math.FloatBetween(0, 1));
+      playGateFx(this, go.x, go.y, mystery.label, Boolean(mystery.strong));
+
+      if (mystery.kind === 'loseBall') {
+        this.resolver.collectLost(0);
+        this.despawn(go);
+        this.checkEnd();
+        return;
+      }
+
+      this.applyGateReward(go, passed, mystery.effect, false);
+      return;
+    }
+
+    this.applyGateReward(go, passed, effect, true);
+  }
+
+  private applyGateReward(
+    go: Phaser.GameObjects.Arc,
+    passed: Set<string>,
+    effect: BoardDef['gates'][number]['effect'],
+    showFx: boolean,
+  ): void {
+    if (effect.type === 'gateMultiply') {
+      const factor = Math.max(1, Math.floor(Number(effect.params.factor ?? 1)));
       const bonusCount = Math.min(factor - 1, MAX_BONUS_BALLS_PER_GATE);
       this.spawnBonusBalls(go, bonusCount, passed);
-      playGateFx(this, go.x, go.y, `x${factor}!`, factor >= STRONG_GATE_THRESHOLD);
+      if (showFx) playGateFx(this, go.x, go.y, `x${factor}!`, factor >= STRONG_GATE_THRESHOLD);
       return;
     }
 
@@ -716,7 +735,7 @@ export class DropScene extends Phaser.Scene {
       const amount = Math.max(0, Math.floor(Number(effect.params.amount ?? 0)));
       const bonusCount = Math.min(amount, MAX_BONUS_BALLS_PER_GATE);
       this.spawnBonusBalls(go, bonusCount, passed);
-      playGateFx(this, go.x, go.y, `+${bonusCount}!`, true);
+      if (showFx) playGateFx(this, go.x, go.y, `+${bonusCount}!`, true);
     }
   }
 
