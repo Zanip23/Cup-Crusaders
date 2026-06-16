@@ -34,8 +34,11 @@ const DRIP_INTERVAL_MS = 22;
 const BALLS_PER_DRIP = 2; // mehrere Bälle pro Tick → dichter Strom (Masse)
 const MAX_BONUS_BALLS_PER_GATE = 6; // höhere Multiplikatoren (x8) wirken spürbar
 const STRONG_GATE_THRESHOLD = 3;
-const SPIN_TIMEOUT_MS = 12000; // harte Timeout-Sicherung: Phase endet garantiert
-const IDLE_END_MS = 2000; // füllt sich der Becher ~2s nicht mehr → Phase beenden
+const SPIN_TIMEOUT_MS = 10000; // harte Timeout-Sicherung: Phase endet garantiert
+const NO_CATCH_END_MS = 800; // Becher füllt sich seit 0,8s nicht mehr → Phase beenden
+const VACUUM_AFTER_MS = 2500; // nach dieser freien Kaskade alle Reste in den Becher saugen
+const STUCK_MS = 1300; // Ball bewegt sich ~1,3s kaum → festhängend, entfernen
+const STUCK_DIST = 6; // px-Schwelle „hat sich bewegt"
 const CUP_Y = 180; // beweglicher Ausschütt-Becher (oben)
 const CATCHER_Y = GAME_HEIGHT - 150; // fester Fang-Becher (unten)
 const LOST_Y = GAME_HEIGHT - 40; // unter dem Trichter durchgerutscht → verloren
@@ -57,7 +60,8 @@ export class DropScene extends Phaser.Scene {
   private speedIndex = 0;
   private lastFxTotal = 0; // gedrosseltes Catch-FX: zeigt „+N" pro Burst
   private lastFxAt = 0;
-  private lastProgressAt = 0; // letzter Fang/Spawn — für das Idle-Phasenende
+  private lastCatchAt = 0; // letzter Becher-Treffer — Phase endet, wenn er aufhört
+  private allSpawnedAt = 0; // Zeitpunkt, ab dem alle Bälle ausgeschüttet sind
   private ammo = 0;
   private spawned = 0;
   private releasing = false;
@@ -128,7 +132,8 @@ export class DropScene extends Phaser.Scene {
     this.speedIndex = 0;
     this.lastFxTotal = 0;
     this.lastFxAt = 0;
-    this.lastProgressAt = 0;
+    this.lastCatchAt = 0;
+    this.allSpawnedAt = 0;
     this.active.clear();
     this.fillBalls.length = 0;
   }
@@ -461,7 +466,6 @@ export class DropScene extends Phaser.Scene {
       return;
     }
     this.releasing = true;
-    this.lastProgressAt = this.time.now;
     this.cup.disableInteractive();
     this.cupHintText?.setText('Ausschütten läuft …');
     this.playCupReleaseFeedback();
@@ -480,22 +484,35 @@ export class DropScene extends Phaser.Scene {
     for (let i = 0; i < BALLS_PER_DRIP; i += 1) {
       if (this.active.size >= this.board.maxConcurrentBalls) return; // Performance-Cap
       if (this.spawned >= this.ammo) {
+        if (!this.allSpawned) this.allSpawnedAt = this.time.now;
         this.allSpawned = true;
         return;
       }
       this.spawned += 1;
-      this.lastProgressAt = this.time.now;
       this.updateCupAmmo(this.ammo - this.spawned);
       this.spawnBallFromCup();
     }
+  }
+
+  // Gemeinsame Ball-Initialisierung: Wert, durchlaufene Zonen, Bewegungs-Tracking.
+  private initBall(
+    ball: Phaser.GameObjects.Arc,
+    x: number,
+    y: number,
+    inheritedGates?: Set<string>,
+  ): void {
+    ball.setData('value', 1);
+    ball.setData('gates', new Set(inheritedGates ?? []));
+    ball.setData('mx', x);
+    ball.setData('my', y);
+    ball.setData('mAt', this.time.now);
   }
 
   private spawnBallFromCup(): void {
     const x = this.cup.x + Phaser.Math.Between(-22, 22);
     const y = CUP_Y + Phaser.Math.Between(18, 34);
     const ball = this.add.circle(x, y, BALL_RADIUS, 0xffffff);
-    ball.setData('value', 1);
-    ball.setData('gates', new Set<string>());
+    this.initBall(ball, x, y);
     this.matter.add.gameObject(ball, {
       shape: { type: 'circle', radius: BALL_RADIUS },
       restitution: this.board.defaultRestitution,
@@ -637,8 +654,7 @@ export class DropScene extends Phaser.Scene {
       const x = Phaser.Math.Clamp(sourceBall.x + side * spread, BALL_RADIUS, GAME_WIDTH - BALL_RADIUS);
       const y = sourceBall.y - Phaser.Math.Between(4, 12);
       const ball = this.add.circle(x, y, BALL_RADIUS, 0xffffff).setDepth(sourceBall.depth);
-      ball.setData('value', 1);
-      ball.setData('gates', new Set(inheritedGates ?? []));
+      this.initBall(ball, x, y, inheritedGates);
       this.matter.add.gameObject(ball, {
         shape: { type: 'circle', radius: BALL_RADIUS },
         restitution: this.board.defaultRestitution,
@@ -661,13 +677,29 @@ export class DropScene extends Phaser.Scene {
     this.tweens.add({ targets: go, scale: 1.5, duration: 80, yoyo: true });
   }
 
+  // Boost-Balken: katapultiert den Ball EINMAL nach oben (zweite Chance an den
+  // Multiplikatoren) und verdoppelt die Anzahl. Bei erneuter Berührung fällt der
+  // Ball durch (Sensor) — wie in der Referenz.
   private handleBooster(go: Phaser.GameObjects.Arc, body: MatterBody, index: number): void {
     const booster = this.board.boosters?.[index];
     if (!booster) return;
-    this.handleGate(go, `booster:${index}`, booster.effect);
-    body.velocity.x += Phaser.Math.FloatBetween(-2.4, 2.4);
-    body.velocity.y = Math.min(body.velocity.y, -7.5);
-    this.tweens.add({ targets: go, alpha: 0.45, duration: 60, yoyo: true });
+    const id = `booster:${index}`;
+    const passed = go.getData('gates') as Set<string>;
+    if (passed.has(id)) return; // schon gesprungen → durchfallen
+    this.handleGate(go, id, booster.effect); // markiert id + verdoppelt die Anzahl
+
+    // WICHTIG: Geschwindigkeit über die Matter-API setzen (passt positionPrev an),
+    // sonst überschreibt der nächste Physik-Step die direkte velocity-Zuweisung.
+    this.setBallVelocity(
+      go,
+      body.velocity.x + Phaser.Math.FloatBetween(-2.2, 2.2),
+      -Phaser.Math.FloatBetween(8, 10),
+    );
+    this.tweens.add({ targets: go, alpha: 0.5, scaleX: 1.4, scaleY: 0.7, duration: 70, yoyo: true });
+  }
+
+  private setBallVelocity(go: Phaser.GameObjects.Arc, vx: number, vy: number): void {
+    (go as unknown as Phaser.Physics.Matter.Components.Velocity).setVelocity(vx, vy);
   }
 
   // Ball im Fang-Becher gelandet: +1 verbuchen. Bei dichtem Strom landen hunderte
@@ -678,7 +710,7 @@ export class DropScene extends Phaser.Scene {
     const x = go.x;
     const y = go.y;
     this.resolver.collect(go.getData('value') as number, 1);
-    this.lastProgressAt = this.time.now;
+    this.lastCatchAt = this.time.now;
     this.despawn(go);
     this.addFillBall();
 
@@ -745,20 +777,48 @@ export class DropScene extends Phaser.Scene {
 
   private sweep(): void {
     if (this.finished) return;
-    // Bälle, die den Catcher verfehlt haben (unter der Lost-Linie), als verloren
-    // verbuchen und entfernen, damit die Phase garantiert endet.
+    const now = this.time.now;
+    // Sog in den Becher: greift, sobald nur noch wenige Nachzügler übrig sind ODER
+    // die freie Kaskade lang genug lief (VACUUM_AFTER_MS). So bleibt der Drop kurz,
+    // ohne den Masse-Effekt der ersten Sekunden zu verlieren.
+    const vacuum =
+      this.allSpawned &&
+      (this.active.size <= 8 || this.time.now - this.allSpawnedAt > VACUUM_AFTER_MS);
+    if (vacuum) {
+      for (const go of this.active) {
+        this.setBallVelocity(go, (CENTER_X - go.x) * 0.06, 16);
+      }
+    }
+    // Becher füllt sich nicht mehr: Ist alles ausgeschüttet, hat der Becher schon
+    // Bälle (≥1 Treffer) und kam seit NO_CATCH_END_MS keiner mehr dazu → Phase
+    // beenden. Genau das Gefühl „alle Bälle sind drin, jetzt weiter".
+    if (
+      this.allSpawned &&
+      this.resolver.total() > 0 &&
+      now - this.lastCatchAt > NO_CATCH_END_MS
+    ) {
+      this.forceEnd();
+      return;
+    }
     for (const go of [...this.active]) {
+      // Verfehlt (unter der Lost-Linie) → verloren.
       if (go.y > LOST_Y) {
         this.resolver.collectLost(0);
         this.despawn(go);
+        continue;
       }
-    }
-    // Idle-Ende: Alles ausgeschüttet und der Becher füllt sich seit IDLE_END_MS
-    // nicht mehr (festhängende/herumspringende Bälle) → Phase jetzt beenden,
-    // statt bis zum harten Timeout zu warten.
-    if (this.releasing && this.allSpawned && this.time.now - this.lastProgressAt > IDLE_END_MS) {
-      this.forceEnd();
-      return;
+      // Festhängend? Bewegt sich der Ball seit STUCK_MS um < STUCK_DIST, gilt er als
+      // verklemmt (auf einem Pfosten/in einer Ecke) und wird entfernt — so endet die
+      // Phase zügig, statt auf den harten Timeout zu warten.
+      const moved = Math.hypot(go.x - (go.getData('mx') as number), go.y - (go.getData('my') as number));
+      if (moved > STUCK_DIST) {
+        go.setData('mx', go.x);
+        go.setData('my', go.y);
+        go.setData('mAt', now);
+      } else if (this.allSpawned && now - (go.getData('mAt') as number) > STUCK_MS) {
+        this.resolver.collectLost(0);
+        this.despawn(go);
+      }
     }
     this.checkEnd();
   }
@@ -833,7 +893,7 @@ export class DropScene extends Phaser.Scene {
     this.tweens.add({
       targets: counter,
       value: total,
-      duration: Phaser.Math.Clamp(total * 28, 520, 1200),
+      duration: Phaser.Math.Clamp(total * 14, 300, 650),
       ease: 'Cubic.easeOut',
       onUpdate: () => {
         const current = Math.round(counter.value);
@@ -843,7 +903,7 @@ export class DropScene extends Phaser.Scene {
       onComplete: () => {
         this.sumText.setText(`Σ ${total}`);
         summary.setText(`Gesamt: ${total}`);
-        this.time.delayedCall(450, onComplete);
+        this.time.delayedCall(250, onComplete);
       },
     });
   }

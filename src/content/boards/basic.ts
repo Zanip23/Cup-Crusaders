@@ -50,7 +50,7 @@ export const BOARD_BASIC: BoardDef = {
   width: W,
   height: 1280,
   gravity: 1,
-  defaultRestitution: 0.38,
+  defaultRestitution: 0.3,
   catcherWidth: 168,
   pegs: [],
   platforms: [
@@ -77,7 +77,7 @@ export const BOARD_DENSE: BoardDef = {
   width: W,
   height: 1280,
   gravity: 1,
-  defaultRestitution: 0.42,
+  defaultRestitution: 0.34,
   catcherWidth: 150,
   pegs: [],
   platforms: [
