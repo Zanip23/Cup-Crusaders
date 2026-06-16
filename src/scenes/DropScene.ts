@@ -8,21 +8,32 @@ import { GameEvent } from '@/core/events/GameEvents';
 import { selectBallsFromCombat } from '@/core/state/selectors';
 import { BOARD_BASIC, BOARD_REGISTRY } from '@/content/boards/basic';
 import { getLevel } from '@/content/levels';
-import { applyGateEffect, DropResolver } from '@/systems/drop/DropResolver';
+import { applyBarValue, applyGateEffect, DropResolver } from '@/systems/drop/DropResolver';
 import { buildHeroStats } from '@/systems/combat/heroBuild';
 import { StatKey } from '@/core/stats/StatTypes';
 import type { BoardDef } from '@/types/content';
 
 // Drop-Phase mit echter Matter.js-Physik (ADR-009, docs/05). Physik-autoritativ:
-// Bälle sind Value-Carrying Bodies; Tore/Bins sind Sensoren; der DropResolver
-// summiert nur tatsächliche Ergebnisse — kein Steering.
+// Bälle sind Value-Carrying Bodies; Balken/Bins sind Sensoren (bzw. solide
+// zerstörbare Blocker); der DropResolver summiert nur tatsächliche Ergebnisse.
 
 type MatterBody = MatterJS.BodyType & { gameObject?: Phaser.GameObjects.Arc | null };
 
 const BALL_RADIUS = 8;
 const DRIP_INTERVAL_MS = 60;
-const SPIN_TIMEOUT_MS = 18000; // Timeout-Sicherung: Phase endet garantiert
+const SPIN_TIMEOUT_MS = 12000; // Timeout-Sicherung: Phase endet garantiert
 const CUP_Y = 180;
+const BOUNCE_COOLDOWN_MS = 280; // verhindert Mehrfach-Trigger beim Überlappen
+const MAX_BOUNCES = 3; // pro Ball — danach fällt er durch (Phase terminiert sicher)
+const STILL_SPEED = 0.6; // darunter gilt ein Ball als „liegengeblieben"
+const STILL_SWEEPS = 3; // so viele Sweeps (~1,2 s) bis ein liegender Ball einsammelt
+
+interface Breakable {
+  body: MatterJS.BodyType;
+  rect: Phaser.GameObjects.Rectangle;
+  label: Phaser.GameObjects.Text;
+  hp: number;
+}
 
 export class DropScene extends Phaser.Scene {
   private board!: BoardDef;
@@ -36,6 +47,7 @@ export class DropScene extends Phaser.Scene {
   private allSpawned = false;
   private finished = false;
   private readonly active = new Set<Phaser.GameObjects.Arc>();
+  private readonly breakables = new Map<number, Breakable>();
   private dripTimer?: Phaser.Time.TimerEvent;
   private collisionHandler?: (e: Phaser.Physics.Matter.Events.CollisionStartEvent) => void;
 
@@ -88,6 +100,7 @@ export class DropScene extends Phaser.Scene {
     this.allSpawned = false;
     this.finished = false;
     this.active.clear();
+    this.breakables.clear();
   }
 
   // ---- Board-Aufbau ------------------------------------------------------
@@ -109,14 +122,49 @@ export class DropScene extends Phaser.Scene {
       this.add.circle(peg.x, peg.y, peg.radius, 0xffffff, 0.65);
     }
 
-    // Tore (Sensoren) + Label.
+    // Tore (Sensoren, optionaler Legacy-Content) + Label.
     this.board.gates.forEach((g, i) => {
       m.add.rectangle(g.x, g.y, g.w, g.h, { isStatic: true, isSensor: true, label: `gate:${i}` });
       this.add.rectangle(g.x, g.y, g.w, g.h, 0x4cc9f0, 0.35).setStrokeStyle(2, 0x4cc9f0);
       this.add.text(g.x, g.y, g.label, { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
     });
 
-    // Bins (Sensoren) + Trennwände + Label.
+    this.buildBars();
+    this.buildBins();
+  }
+
+  private buildBars(): void {
+    const m = this.matter;
+    this.board.bars.forEach((bar, i) => {
+      const color = bar.color ?? 0x888888;
+      if (bar.kind === 'breakable') {
+        // Solider Blocker: hält Bälle auf, bis genug Treffer ihn zerbrechen.
+        const body = m.add.rectangle(bar.x, bar.y, bar.w, bar.h, {
+          isStatic: true,
+          restitution: 0.2,
+          label: `brk:${i}`,
+        });
+        const rect = this.add
+          .rectangle(bar.x, bar.y, bar.w, bar.h, color, 0.95)
+          .setStrokeStyle(3, 0xffffff, 0.5);
+        const hp = bar.hp ?? 1;
+        const label = this.add
+          .text(bar.x, bar.y, `🧱 ${hp}`, { fontSize: '20px', color: '#ffffff', fontStyle: 'bold' })
+          .setOrigin(0.5);
+        this.breakables.set(i, { body, rect, label, hp });
+        return;
+      }
+      // Wert-/Sprung-Balken: Sensor, Ball läuft hindurch und wird beeinflusst.
+      m.add.rectangle(bar.x, bar.y, bar.w, bar.h, { isStatic: true, isSensor: true, label: `bar:${i}` });
+      this.add.rectangle(bar.x, bar.y, bar.w, bar.h, color, 0.85).setStrokeStyle(2, 0xffffff, 0.6);
+      this.add
+        .text(bar.x, bar.y, bar.label, { fontSize: '22px', color: '#ffffff', fontStyle: 'bold' })
+        .setOrigin(0.5);
+    });
+  }
+
+  private buildBins(): void {
+    const m = this.matter;
     const binTop = GAME_HEIGHT - 360;
     const sensorY = binTop + 40;
     this.board.bins.forEach((b, i) => {
@@ -209,7 +257,10 @@ export class DropScene extends Phaser.Scene {
     const x = this.cup.x + Phaser.Math.Between(-14, 14);
     const ball = this.add.circle(x, CUP_Y + 30, BALL_RADIUS, 0xffffff);
     ball.setData('value', 1);
-    ball.setData('gates', new Set<number>());
+    ball.setData('bars', new Set<number>());
+    ball.setData('bounceAt', 0);
+    ball.setData('bounces', 0);
+    ball.setData('still', 0);
     this.matter.add.gameObject(ball, {
       shape: { type: 'circle', radius: BALL_RADIUS },
       restitution: this.board.defaultRestitution,
@@ -239,6 +290,8 @@ export class DropScene extends Phaser.Scene {
         const go = ballBody.gameObject;
         if (!go || !go.active) continue;
         if (other.startsWith('gate:')) this.handleGate(go, Number(other.slice(5)));
+        else if (other.startsWith('bar:')) this.handleBar(go, ballBody, Number(other.slice(4)));
+        else if (other.startsWith('brk:')) this.handleBreakable(Number(other.slice(4)));
         else if (other.startsWith('bin:')) this.handleBin(go, Number(other.slice(4)));
       }
     };
@@ -246,14 +299,73 @@ export class DropScene extends Phaser.Scene {
   }
 
   private handleGate(go: Phaser.GameObjects.Arc, index: number): void {
-    const passed = go.getData('gates') as Set<number>;
-    if (passed.has(index)) return; // pro Ball nur einmal
-    passed.add(index);
+    const passed = go.getData('bars') as Set<number>;
+    const key = -1000 - index; // Tor-Indizes von Balken-Indizes trennen
+    if (passed.has(key)) return; // pro Ball nur einmal
+    passed.add(key);
     const gate = this.board.gates[index];
     const value = applyGateEffect(go.getData('value') as number, gate.effect);
     go.setData('value', value);
-    go.setFillStyle(value >= 10 ? 0xf4c430 : value >= 2 ? 0xffa726 : 0xffffff);
+    this.tintByValue(go, value);
     this.tweens.add({ targets: go, scale: 1.5, duration: 90, yoyo: true });
+  }
+
+  private handleBar(go: Phaser.GameObjects.Arc, body: MatterBody, index: number): void {
+    const bar = this.board.bars[index];
+
+    if (bar.kind === 'bounce') {
+      // Sprungbalken: Bälle wieder nach oben schleudern (mit kurzer Sperre,
+      // damit der überlappende Sensor nicht mehrfach feuert). Begrenzte Anzahl
+      // Sprünge je Ball + seitlicher Drift → der Ball entkommt garantiert und
+      // die Phase terminiert (kein Dauer-Ping-Pong).
+      const now = this.time.now;
+      if (now - (go.getData('bounceAt') as number) < BOUNCE_COOLDOWN_MS) return;
+      const bounces = go.getData('bounces') as number;
+      if (bounces >= MAX_BOUNCES) return; // erschöpft → fällt hindurch
+      go.setData('bounceAt', now);
+      go.setData('bounces', bounces + 1);
+      const strength = bar.amount ?? 12;
+      this.matter.setVelocity(body, body.velocity.x * 0.4 + Phaser.Math.Between(-3, 3), -strength);
+      this.tweens.add({ targets: go, scale: 1.4, duration: 110, yoyo: true });
+      return;
+    }
+
+    // Wert-Balken (multiply / add / subtract): einmal je Ball.
+    const passed = go.getData('bars') as Set<number>;
+    if (passed.has(index)) return;
+    passed.add(index);
+    const value = applyBarValue(go.getData('value') as number, bar.kind, bar.amount ?? 0);
+    go.setData('value', value);
+    this.tintByValue(go, value);
+    this.tweens.add({ targets: go, scale: 1.5, duration: 90, yoyo: true });
+  }
+
+  private handleBreakable(index: number): void {
+    const brk = this.breakables.get(index);
+    if (!brk) return;
+    brk.hp -= 1;
+    if (brk.hp <= 0) {
+      // Zerbrochen: Body + Visuals entfernen, Bälle fallen nun hindurch.
+      this.matter.world.remove(brk.body);
+      this.tweens.add({
+        targets: [brk.rect, brk.label],
+        alpha: 0,
+        scaleY: 0.2,
+        duration: 160,
+        onComplete: () => {
+          brk.rect.destroy();
+          brk.label.destroy();
+        },
+      });
+      this.breakables.delete(index);
+      return;
+    }
+    brk.label.setText(`🧱 ${brk.hp}`);
+    this.tweens.add({ targets: brk.rect, scaleX: 0.96, duration: 60, yoyo: true });
+  }
+
+  private tintByValue(go: Phaser.GameObjects.Arc, value: number): void {
+    go.setFillStyle(value >= 10 ? 0xf4c430 : value >= 2 ? 0xffa726 : value <= 0 ? 0x6b7280 : 0xffffff);
   }
 
   private handleBin(go: Phaser.GameObjects.Arc, index: number): void {
@@ -288,10 +400,21 @@ export class DropScene extends Phaser.Scene {
 
   private sweep(): void {
     if (this.finished) return;
-    // Off-Screen / feststeckende Bälle einsammeln (Mindestwert), damit die Phase endet.
     for (const go of [...this.active]) {
+      // Off-Screen → verloren (Mindestwert), damit die Phase endet.
       if (go.y > GAME_HEIGHT + 40) {
         this.resolver.collectLost(0);
+        this.despawn(go);
+        continue;
+      }
+      // Auf einem (zerstörbaren) Balken liegengebliebene Bälle einsammeln —
+      // sie zählen mit ihrem getragenen Wert, statt bis zum Timeout zu warten.
+      const body = go.body as MatterBody | undefined;
+      const speed = body ? body.speed : 0;
+      const still = (go.getData('still') as number) + (speed < STILL_SPEED ? 1 : -1);
+      go.setData('still', Math.max(0, still));
+      if ((go.getData('still') as number) >= STILL_SWEEPS) {
+        this.resolver.collectLost(go.getData('value') as number);
         this.despawn(go);
       }
     }

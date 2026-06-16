@@ -3,7 +3,7 @@
 // passiert (Wert ändern) bzw. in einem Bin landet (Beitrag verbuchen).
 // Reine Logik, testbar.
 
-import type { Effect } from '@/types/content';
+import type { BarKind, Effect } from '@/types/content';
 
 /** Wendet einen Tor-Effekt auf den Ball-Wert an (gateMultiply / gateAdd). */
 export function applyGateEffect(value: number, effect: Effect): number {
@@ -14,6 +14,24 @@ export function applyGateEffect(value: number, effect: Effect): number {
     return value + Number(effect.params.amount ?? 0);
   }
   return value;
+}
+
+/**
+ * Wert-Wirkung eines Balkens (multiply / add / subtract). Nicht-wertende Balken
+ * (bounce / breakable) lassen den Wert unverändert. Subtraktion ist bei 0
+ * gekappt — ein Ball trägt nie einen negativen Wert.
+ */
+export function applyBarValue(value: number, kind: BarKind, amount = 0): number {
+  switch (kind) {
+    case 'multiply':
+      return value * amount;
+    case 'add':
+      return value + amount;
+    case 'subtract':
+      return Math.max(0, value - amount);
+    default:
+      return value;
+  }
 }
 
 /** Beitrag eines Balls in einem Bin = value × multiplier (docs/05). */

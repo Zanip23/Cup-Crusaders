@@ -1,4 +1,7 @@
-/* Shop-DOM-Overlay (docs/06). Über dem Canvas, Safe-Areas + A11y (ADR-011). */
+/* Shop-DOM-Overlay (docs/06). Über dem Canvas, Safe-Areas + A11y (ADR-011).
+   Scrollbar + sticky „Weiter"-Button: auf kleinen Displays sind die Karten
+   höher als der Viewport — der Weiter-Button muss trotzdem immer erreichbar
+   bleiben (sonst hängt der Spieler im Shop fest). */
 .cc-shop {
   position: fixed;
   inset: 0;
@@ -6,34 +9,40 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  gap: 16px;
   box-sizing: border-box;
-  padding: calc(env(safe-area-inset-top) + 24px) 16px calc(env(safe-area-inset-bottom) + 24px);
-  background: rgba(10, 10, 24, 0.82);
+  padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px);
+  background: rgba(10, 10, 24, 0.9);
   font-family: system-ui, -apple-system, sans-serif;
   color: #e6e6f0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   -webkit-user-select: none;
   user-select: none;
 }
 .cc-shop__header {
+  flex-shrink: 0;
   font-size: 1.6rem;
   font-weight: 700;
   color: #f4c430;
   text-align: center;
 }
 .cc-shop__cards {
+  flex: 1 0 auto;
   display: flex;
   gap: 14px;
   flex-wrap: wrap;
   justify-content: center;
+  align-content: center;
   align-items: stretch;
   width: 100%;
   max-width: 640px;
 }
 .cc-card {
-  flex: 1 1 170px;
+  flex: 1 1 160px;
   max-width: 200px;
-  min-height: 240px;
+  min-height: 200px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -80,20 +89,47 @@
   cursor: not-allowed;
 }
 .cc-shop__next {
-  min-width: 280px;
-  min-height: 56px;
-  padding: 14px 28px;
-  font-size: 1.2rem;
+  position: sticky;
+  bottom: 0;
+  flex-shrink: 0;
+  width: min(420px, 100%);
+  min-height: 60px;
+  margin-top: 4px;
+  padding: 16px 28px;
+  font-size: 1.25rem;
   font-weight: 700;
   color: #fff;
   background: #e94560;
-  border: none;
-  border-radius: 12px;
+  border: 3px solid #ff7891;
+  border-radius: 14px;
+  box-shadow: 0 -8px 24px rgba(10, 10, 24, 0.9);
   cursor: pointer;
 }
 .cc-shop__next:focus-visible {
   outline: 3px solid #fff;
   outline-offset: 2px;
+}
+/* Schmale Hochkant-Displays: Karten kompakter, damit weniger gescrollt wird. */
+@media (max-width: 520px) {
+  .cc-card {
+    flex: 1 1 100%;
+    max-width: 320px;
+    min-height: 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    text-align: left;
+    padding: 12px 14px;
+  }
+  .cc-card__icon {
+    font-size: 2rem;
+  }
+  .cc-card__name {
+    flex: 1;
+  }
+  .cc-card__desc {
+    flex: 1 1 100%;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .cc-card {

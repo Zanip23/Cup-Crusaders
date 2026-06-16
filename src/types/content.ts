@@ -147,6 +147,27 @@ export interface BinDef {
   special?: Effect;
 }
 
+/**
+ * Horizontale Balken im Drop-Board (docs/05). Vier Wirkungen:
+ *  - multiply / add / subtract: Sensor-Balken, verändern den Ballwert einmal je Ball.
+ *  - bounce: Sensor-Balken, schleudert Bälle wieder nach oben.
+ *  - breakable: SOLIDER Balken, der Bälle blockiert und erst nach `hp` Treffern
+ *    zerbricht — danach fallen Bälle hindurch.
+ */
+export type BarKind = 'multiply' | 'add' | 'subtract' | 'bounce' | 'breakable';
+
+export interface BarDef {
+  x: number; // Mittelpunkt x
+  y: number; // Mittelpunkt y
+  w: number;
+  h: number;
+  kind: BarKind;
+  amount?: number; // multiply: Faktor · add/subtract: Betrag · bounce: Stärke
+  hp?: number; // breakable: benötigte Ball-Treffer bis zum Zerbrechen
+  label: string;
+  color?: number;
+}
+
 export interface BoardDef {
   id: string;
   width: number;
@@ -155,6 +176,7 @@ export interface BoardDef {
   defaultRestitution: number; // Bounce
   pegs: PegDef[];
   gates: GateDef[];
+  bars: BarDef[];
   bins: BinDef[];
   maxConcurrentBalls: number; // Performance-Cap (docs/05)
 }
