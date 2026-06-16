@@ -20,7 +20,7 @@ import type { BoardDef } from '@/types/content';
 type MatterBody = MatterJS.BodyType & { gameObject?: Phaser.GameObjects.Arc | null };
 
 const BALL_RADIUS = 8;
-const DRIP_INTERVAL_MS = 60;
+const DRIP_INTERVAL_MS = 34;
 const MAX_BONUS_BALLS_PER_GATE = 4;
 const STRONG_GATE_THRESHOLD = 3;
 const SPIN_TIMEOUT_MS = 18000; // Timeout-Sicherung: Phase endet garantiert
@@ -55,6 +55,10 @@ export class DropScene extends Phaser.Scene {
   private finished = false;
   private readonly active = new Set<Phaser.GameObjects.Arc>();
   private dripTimer?: Phaser.Time.TimerEvent;
+  private cupHintText?: Phaser.GameObjects.Text;
+  private cupDragStartX = 0;
+  private cupWasDragged = false;
+  private cupDisplayedAmmo = 0;
   private collisionHandler?: (e: Phaser.Physics.Matter.Events.CollisionStartEvent) => void;
 
   constructor() {
@@ -425,6 +429,7 @@ export class DropScene extends Phaser.Scene {
     const rim = this.add.ellipse(0, -20, 124, 24, 0xffffff, 0.96).setStrokeStyle(3, 0xd7f3ff, 0.95);
     const innerRim = this.add.ellipse(0, -20, 100, 12, 0x6d1b31, 0.34);
     const shine = this.add.rectangle(-24, -1, 13, 35, 0xffffff, 0.22).setRotation(0.16);
+    this.cupDisplayedAmmo = this.ammo;
     this.cupAmmoText = this.add
       .text(0, 7, `${this.ammo}`, {
         fontSize: '30px',
@@ -440,38 +445,86 @@ export class DropScene extends Phaser.Scene {
     this.cup.setSize(124, 64);
     this.cup.setInteractive({ useHandCursor: true, draggable: true });
 
-    // Drag (horizontal) ...
+    this.cup.on('pointerdown', () => {
+      this.cupDragStartX = this.cup.x;
+      this.cupWasDragged = false;
+      this.tweens.add({
+        targets: this.cup,
+        scaleX: 1.04,
+        scaleY: 0.97,
+        duration: 90,
+        ease: 'Sine.easeOut',
+      });
+    });
+
+    // Drag (horizontal) bewegt den Becher direkt und kippt ihn leicht in Zugrichtung.
     this.input.on(
       'drag',
       (_p: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject, dragX: number) => {
-        if (obj === this.cup) this.cup.x = Phaser.Math.Clamp(dragX, 70, GAME_WIDTH - 70);
+        if (obj !== this.cup || this.releasing || this.finished) return;
+        const nextX = Phaser.Math.Clamp(dragX, 70, GAME_WIDTH - 70);
+        const delta = nextX - this.cup.x;
+        this.cup.x = nextX;
+        this.cup.rotation = Phaser.Math.Clamp(delta * 0.012, -0.16, 0.16);
+        if (Math.abs(this.cup.x - this.cupDragStartX) > 8) this.cupWasDragged = true;
       },
     );
-    // ... und Tap auf den Becher = ausschütten (Alternative zur Drag-Bedienung).
-    this.cup.on('pointerup', () => this.release());
+
+    this.input.on(
+      'dragend',
+      (_p: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
+        if (obj === this.cup) this.settleCupTilt();
+      },
+    );
+
+    // Tap auf den Becher startet den Drop; ein vorheriger Drag zählt nur als Positionieren.
+    this.cup.on('pointerup', () => {
+      this.settleCupTilt();
+      if (!this.cupWasDragged) this.release();
+    });
   }
 
   private buildControls(): void {
-    // WCAG 2.5.7: jede Drag-Funktion zusätzlich per Buttons bedienbar.
-    createButton(this, CENTER_X, GAME_HEIGHT - 90, 'Ausschütten', () => this.release(), {
-      fill: COLORS.accent,
-      width: 260,
-      height: 64,
-    });
-    createButton(this, 110, GAME_HEIGHT - 90, '◀', () => this.nudgeCup(-50), {
-      fill: 0x444466,
-      width: 90,
-      height: 64,
-    });
-    createButton(this, GAME_WIDTH - 110, GAME_HEIGHT - 90, '▶', () => this.nudgeCup(50), {
-      fill: 0x444466,
-      width: 90,
-      height: 64,
-    });
+    this.cupHintText = this.add
+      .text(CENTER_X, CUP_Y + 66, 'Becher antippen oder ziehen • Space/Enter zum Start', {
+        fontSize: '18px',
+        color: '#d7f3ff',
+        stroke: '#06111f',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setAlpha(0.82)
+      .setDepth(19);
+
+    // WCAG 2.5.7: Drag-Funktion zusätzlich über dezente Buttons bedienbar.
+    createButton(this, 78, GAME_HEIGHT - 92, '◀', () => this.nudgeCup(-44), {
+      fill: 0x24344f,
+      width: 76,
+      height: 46,
+    }).setAlpha(0.74);
+    createButton(this, GAME_WIDTH - 78, GAME_HEIGHT - 92, '▶', () => this.nudgeCup(44), {
+      fill: 0x24344f,
+      width: 76,
+      height: 46,
+    }).setAlpha(0.74);
   }
 
   private nudgeCup(dx: number): void {
+    if (this.releasing || this.finished) return;
     this.cup.x = Phaser.Math.Clamp(this.cup.x + dx, 70, GAME_WIDTH - 70);
+    this.cup.rotation = Phaser.Math.Clamp(dx * 0.004, -0.14, 0.14);
+    this.settleCupTilt();
+  }
+
+  private settleCupTilt(): void {
+    this.tweens.add({
+      targets: this.cup,
+      rotation: 0,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 190,
+      ease: 'Back.easeOut',
+    });
   }
 
   // Tastatur als zusätzliche Eingabe (A11y/Desktop): ←/→ bewegen, Leer/Enter schüttet aus.
@@ -493,6 +546,9 @@ export class DropScene extends Phaser.Scene {
       return;
     }
     this.releasing = true;
+    this.cup.disableInteractive();
+    this.cupHintText?.setText('Ausschütten läuft …');
+    this.playCupReleaseFeedback();
     this.dripTimer = this.time.addEvent({
       delay: DRIP_INTERVAL_MS,
       loop: true,
@@ -510,10 +566,11 @@ export class DropScene extends Phaser.Scene {
       return;
     }
     this.spawned += 1;
-    this.cupAmmoText.setText(`${this.ammo - this.spawned}`);
+    this.updateCupAmmo(this.ammo - this.spawned);
 
-    const x = this.cup.x + Phaser.Math.Between(-14, 14);
-    const ball = this.add.circle(x, CUP_Y + 30, BALL_RADIUS, 0xffffff);
+    const x = this.cup.x + Phaser.Math.Between(-22, 22);
+    const y = CUP_Y + Phaser.Math.Between(18, 34);
+    const ball = this.add.circle(x, y, BALL_RADIUS, 0xffffff);
     ball.setData('value', 1);
     ball.setData('gates', new Set<string>());
     this.matter.add.gameObject(ball, {
@@ -523,8 +580,64 @@ export class DropScene extends Phaser.Scene {
       frictionAir: 0.008,
       label: 'ball',
     });
-    (ball.body as MatterBody).collisionFilter.group = -1; // Bälle kollidieren nicht untereinander (Perf)
+    const body = ball.body as MatterBody;
+    body.collisionFilter.group = -1; // Bälle kollidieren nicht untereinander (Perf)
+    body.velocity.x = Phaser.Math.FloatBetween(-0.9, 0.9) + (x - this.cup.x) * 0.025;
+    body.velocity.y = Phaser.Math.FloatBetween(1.2, 2.7);
     this.active.add(ball);
+    this.playStreamParticle(x, y);
+  }
+
+  private playCupReleaseFeedback(): void {
+    this.tweens.killTweensOf(this.cup);
+    this.cup.rotation = -0.08;
+    this.tweens.add({
+      targets: this.cup,
+      rotation: { from: -0.1, to: 0.1 },
+      scaleX: { from: 1.08, to: 0.98 },
+      scaleY: { from: 0.94, to: 1.04 },
+      duration: 70,
+      yoyo: true,
+      repeat: 3,
+      ease: 'Sine.easeInOut',
+      onComplete: () => this.settleCupTilt(),
+    });
+    this.cameras.main.shake(90, 0.0025);
+  }
+
+  private updateCupAmmo(value: number): void {
+    const counter = { value: this.cupDisplayedAmmo };
+    this.cupDisplayedAmmo = value;
+    this.tweens.killTweensOf(this.cupAmmoText);
+    this.tweens.add({
+      targets: counter,
+      value,
+      duration: Math.max(70, DRIP_INTERVAL_MS * 1.8),
+      ease: 'Sine.easeOut',
+      onUpdate: () => this.cupAmmoText.setText(`${Math.round(counter.value)}`),
+      onComplete: () => this.cupAmmoText.setText(`${value}`),
+    });
+    this.tweens.add({
+      targets: this.cupAmmoText,
+      scale: 1.22,
+      duration: 55,
+      yoyo: true,
+      ease: 'Sine.easeOut',
+    });
+  }
+
+  private playStreamParticle(x: number, y: number): void {
+    const mist = this.add
+      .circle(x + Phaser.Math.Between(-9, 9), y - 8, Phaser.Math.FloatBetween(2, 4), 0xdff7ff, 0.42)
+      .setDepth(18);
+    this.tweens.add({
+      targets: mist,
+      y: y + Phaser.Math.Between(18, 34),
+      alpha: 0,
+      scale: 0.35,
+      duration: 210,
+      onComplete: () => mist.destroy(),
+    });
   }
 
   private registerCollisions(): void {
