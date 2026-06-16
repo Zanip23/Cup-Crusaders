@@ -68,26 +68,42 @@ npm run dev      # Dev-Server (Vite, HMR) → http://localhost:5173
 npm run build    # Typecheck + Production-Build nach dist/
 npm test         # Vitest (reine Logik: Reducer, Rng, Loop-Integration)
 npm run lint     # ESLint
+npm run e2e      # Playwright-E2E (echter Browser, klickt den Loop durch)
 ```
 
-### Visueller Smoke-Test (echter Browser)
+### E2E / visueller Smoke-Test (Playwright)
 
-`tools/clickthrough.mjs` klickt den kompletten Loop in Headless-Chromium durch
-(zwei Wellen inkl. zweitem Shop-Besuch) und legt Screenshots ab. Er sammelt
-Konsolenfehler als Pass/Fail-Signal — so wurde u. a. der Szenen-Stacking-Bug
-gefunden.
+`tests-e2e/loop.spec.ts` klickt den kompletten Loop im echten Browser durch
+(zwei Wellen inkl. zweitem Shop-Besuch) und sammelt Konsolenfehler als Pass/Fail
+— so wurden u. a. der Szenen-Stacking- und der ShopScene-Reset-Bug gefunden.
 
 ```bash
-# Terminal 1
-npm run dev
-# Terminal 2
-npm run clickthrough          # Screenshots → /tmp/shots (oder OUT=… setzen)
+# Standard (lokal / CI): startet den Dev-Server selbst via webServer-Config
+CHROME_BIN=/pfad/zu/chrome npm run e2e
 ```
 
-> Nutzt `puppeteer-core` + `@sparticuz/chromium` (npm-gebündelter Chromium-Binary)
-> statt Playwright, weil die Playwright-Browser-CDN in der CI-/Web-Umgebung
-> blockiert ist. Auf manchen Distributionen werden zusätzlich System-Libs
-> (z. B. `libnss3`) benötigt.
+**Browser-Binary:** Playwrights eigene (gepatchte) Chromium-Builds liegen nur auf
+`cdn.playwright.dev` / `azureedge` — diese Hosts sind in der CI-/Web-Umgebung per
+Egress-Policy blockiert, `npx playwright install` schlägt dort fehl. Daher nutzen
+wir ein beliebiges Chromium via `CHROME_BIN`:
+
+- **Chrome for Testing** (von `storage.googleapis.com`, erlaubt):
+  `chrome-linux64.zip` aus `https://storage.googleapis.com/chrome-for-testing-public/<version>/linux64/`
+  entpacken und `CHROME_BIN` auf das `chrome`-Binary setzen.
+- **Fallback ohne Download-Host:** `@sparticuz/chromium` liefert einen Chromium-
+  Binary direkt im npm-Paket. Der Standalone-Runner unten nutzt ihn automatisch,
+  wenn `CHROME_BIN` nicht gesetzt ist.
+
+**Sandbox-tauglicher Standalone-Runner** (ein einzelner Node-Prozess, serviert das
+gebaute `dist/` selbst — robust, wo der Playwright-Test-Runner Worker forkt oder
+Hintergrund-Server gekillt werden):
+
+```bash
+npm run build
+npm run clickthrough          # Screenshots + result.txt → /tmp/shots-pw (OUT=… überschreibbar)
+```
+
+> Auf manchen Distributionen werden zusätzlich System-Libs (z. B. `libnss3`) benötigt.
 
 ### Was in M1 steht
 
