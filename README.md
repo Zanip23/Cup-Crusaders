@@ -53,16 +53,15 @@ Deliverable. Lies in dieser Reihenfolge:
 
 ## Status
 
-🟢 **M4 – Shop-Phase & Vertical Slice komplett.** Der Shop ist ein **DOM-Overlay**
-(docs/06): 3 gewichtete Karten aus einem seedbaren Pool, Kosten-Skalierung pro Welle,
-mehrere Käufe pro Shop (ADR-003). Gekaufte Upgrades fließen über die **StatEngine**
-in den Helden (`buildHeroStats`) und wirken **nachweisbar ab der nächsten Welle**
-(z. B. Mehrfachschuss → mehr Angriffe, Extra-Munition → mehr Drop-Bälle). Damit
-läuft der **vollständige Vertical Slice**: Kampf → Drop → Shop mit echtem Gameplay,
-steigender Schwierigkeit (Gegner- + Kosten-Skalierung) und Run-Ende.
+🟢 **M5 – Meta-Progression.** Hauptmenü (`MetaScene`, DOM-Overlay) mit 6
+Ausrüstungs-Slots, Inventar, **Merge** (3→1 nächste Rarität), **Item-Leveling**
+(Gold/Baupläne) und permanenten **Meta-Fähigkeiten**. Items/Skills fließen als
+`scope:'meta'`-Modifier über `buildHeroStats` in den Helden (gelten ab Run-Start).
+Bosse droppen **garantiert ein Item** (ADR-007). Der `meta`-Scope wird in
+**IndexedDB** persistiert (Save-Versionierung). Routing: Menü → Run → Tod/Sieg → Menü.
 
-Davor: **M3** Matter.js-Pachinko-Drop, **M2** rundenbasiertes Auto-Battle, **M1**
-leerer Loop + `transfer`-Kanal. Siehe [Roadmap](docs/11-roadmap-and-mvp.md).
+Davor: **M4** Shop (DOM, gewichteter Pool, Upgrades wirken), **M3** Matter.js-Drop,
+**M2** Auto-Battle, **M1** leerer Loop. Siehe [Roadmap](docs/11-roadmap-and-mvp.md).
 
 ---
 

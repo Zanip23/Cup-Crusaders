@@ -3,7 +3,12 @@
 
 import type { GameState, MetaState, RunState, SettingsState } from '@/types/state';
 import { SAVE_VERSION } from '@/types/state';
+import type { ItemInstance } from '@/types/content';
 import { runRewardGold } from '@/systems/combat/rewards';
+import { ITEM_REGISTRY } from '@/content/items';
+import { createItemInstance, levelUpCost, nextRarity } from '@/systems/meta/items';
+import { canMerge } from '@/systems/meta/merge';
+import { META_SKILL_REGISTRY, metaSkillCost } from '@/content/metaSkills';
 import type { Action } from './actions';
 
 export function createInitialMeta(): MetaState {
@@ -150,6 +155,92 @@ export function reducer(state: GameState, action: Action): GameState {
           ...state.meta,
           highestLevel: reachedLevel,
           currencies: { ...state.meta.currencies, gold: state.meta.currencies.gold + gold },
+        },
+      };
+    }
+
+    case 'END_RUN': {
+      const gold = action.victory ? runRewardGold(state.run.totalWaves, true) : 0;
+      const highestLevel = Math.max(state.meta.highestLevel, state.run.waveNumber);
+      return {
+        ...state,
+        run: createMenuRun(),
+        meta: {
+          ...state.meta,
+          highestLevel,
+          currencies: { ...state.meta.currencies, gold: state.meta.currencies.gold + gold },
+        },
+      };
+    }
+
+    case 'GRANT_ITEM':
+      return {
+        ...state,
+        meta: { ...state.meta, inventory: [...state.meta.inventory, action.item] },
+      };
+
+    case 'EQUIP_ITEM': {
+      const inst = state.meta.inventory.find((i) => i.instanceId === action.instanceId);
+      const def = inst && ITEM_REGISTRY[inst.baseId];
+      if (!def) return state;
+      return {
+        ...state,
+        meta: { ...state.meta, equipped: { ...state.meta.equipped, [def.slot]: action.instanceId } },
+      };
+    }
+
+    case 'UNEQUIP_ITEM':
+      return {
+        ...state,
+        meta: { ...state.meta, equipped: { ...state.meta.equipped, [action.slot]: null } },
+      };
+
+    case 'MERGE_ITEMS': {
+      const items = action.instanceIds
+        .map((id) => state.meta.inventory.find((i) => i.instanceId === id))
+        .filter((i): i is ItemInstance => !!i);
+      if (!canMerge(items)) return state;
+      const equippedIds = new Set(Object.values(state.meta.equipped).filter(Boolean));
+      if (items.some((i) => equippedIds.has(i.instanceId))) return state;
+      const nr = nextRarity(items[0].rarity);
+      if (!nr) return state;
+      const remaining = state.meta.inventory.filter((i) => !action.instanceIds.includes(i.instanceId));
+      const merged = createItemInstance(items[0].baseId, nr, items[0].level);
+      return { ...state, meta: { ...state.meta, inventory: [...remaining, merged] } };
+    }
+
+    case 'LEVEL_ITEM': {
+      const idx = state.meta.inventory.findIndex((i) => i.instanceId === action.instanceId);
+      if (idx < 0) return state;
+      const inst = state.meta.inventory[idx];
+      const cost = levelUpCost(inst.level);
+      const { gold, blueprints } = state.meta.currencies;
+      if (gold < cost.gold || blueprints < cost.blueprints) return state;
+      const inventory = state.meta.inventory.slice();
+      inventory[idx] = { ...inst, level: inst.level + 1 };
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          inventory,
+          currencies: { gold: gold - cost.gold, blueprints: blueprints - cost.blueprints },
+        },
+      };
+    }
+
+    case 'BUY_META_SKILL': {
+      const def = META_SKILL_REGISTRY[action.skillId];
+      if (!def) return state;
+      const cur = state.meta.metaSkills[action.skillId] ?? 0;
+      if (cur >= def.maxLevel) return state;
+      const cost = metaSkillCost(def, cur);
+      if (state.meta.currencies.gold < cost) return state;
+      return {
+        ...state,
+        meta: {
+          ...state.meta,
+          currencies: { ...state.meta.currencies, gold: state.meta.currencies.gold - cost },
+          metaSkills: { ...state.meta.metaSkills, [action.skillId]: cur + 1 },
         },
       };
     }

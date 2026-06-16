@@ -47,8 +47,10 @@ export class DropScene extends Phaser.Scene {
 
     const gsm = getGsm(this);
     this.board = BOARD_BASIC;
-    // Munition = Kampf-Bälle + StartingBalls-Upgrade (additiv vor Drop-Start, docs/05).
-    const startingBalls = buildHeroStats(gsm.getState().run.upgrades).get(StatKey.StartingBalls);
+    // Munition = Kampf-Bälle + StartingBalls (Upgrade/Item, additiv vor Drop-Start).
+    const startingBalls = buildHeroStats(gsm.getState().run, gsm.getState().meta).get(
+      StatKey.StartingBalls,
+    );
     this.ammo = selectBallsFromCombat(gsm.getState()) + Math.round(startingBalls);
     this.resolver = new DropResolver();
 

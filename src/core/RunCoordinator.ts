@@ -11,9 +11,11 @@ import type { GameStateManager } from '@/core/state/GameStateManager';
 import { Rng } from '@/core/rng/Rng';
 import { FLETCHER } from '@/content/heroes/fletcher';
 import { StatKey } from '@/core/stats/StatTypes';
+import { rollBossItem } from '@/systems/meta/loot';
 
 export const SceneKey = {
   Boot: 'Boot',
+  Meta: 'Meta',
   Combat: 'Combat',
   Drop: 'Drop',
   Shop: 'Shop',
@@ -59,15 +61,30 @@ export class RunCoordinator {
     });
 
     eventBus.on(GameEvent.ShopComplete, () => {
+      const run = this.gsm.getState().run;
+      const wasBoss = run.waveNumber >= run.totalWaves; // letzter (Boss-)Abschnitt
       this.gsm.dispatch({ type: 'SHOP_COMPLETE' });
+      if (wasBoss) {
+        this.endRun(true);
+        return;
+      }
       this.go(SceneKey.Combat);
     });
 
     eventBus.on(GameEvent.PlayerDied, () => {
       this.gsm.dispatch({ type: 'PLAYER_DIED' });
-      // M1: kein Meta-Menü → direkt neuen Run starten.
-      this.startNewRun();
+      this.go(SceneKey.Meta); // zurück ins Hauptmenü (Belohnung via Reducer)
     });
+  }
+
+  /** Run-Ende: bei Sieg garantierter Boss-Item-Drop, dann zurück ins Menü. */
+  private endRun(victory: boolean): void {
+    if (victory) {
+      const seed = this.gsm.getState().run.seed;
+      this.gsm.dispatch({ type: 'GRANT_ITEM', item: rollBossItem(new Rng(seed ^ 0x5eed)) });
+    }
+    this.gsm.dispatch({ type: 'END_RUN', victory });
+    this.go(SceneKey.Meta);
   }
 
   /** Startet einen frischen Run (oder setzt ihn nach Reload an der Phase fort). */
@@ -96,7 +113,7 @@ export class RunCoordinator {
         this.go(SceneKey.Shop);
         break;
       default:
-        this.startNewRun();
+        this.go(SceneKey.Meta); // menu / gameover → Hauptmenü
     }
   }
 

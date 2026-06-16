@@ -78,24 +78,23 @@ describe('Loop-Integration — Durchklicken Kampf → Drop → Shop → Kampf', 
     expect(gsm.getState().run.waveNumber).toBe(4);
   });
 
-  it('Tod beendet den Run, schreibt highestLevel und startet neu', () => {
+  it('Tod beendet den Run (Gold-Belohnung) und kehrt ins Hauptmenü zurück', () => {
     const { start, gsm, coordinator } = makeHarness();
     coordinator.startNewRun();
-    eventBus.emit(GameEvent.ShopComplete, {}); // → Welle 2 (Vereinfachung)
+    eventBus.emit(GameEvent.ShopComplete, {}); // → Welle 2
 
     eventBus.emit(GameEvent.PlayerDied, {});
-    // PLAYER_DIED schreibt highestLevel (erreichte Welle 2), dann frischer Run.
+    // PLAYER_DIED schreibt highestLevel (erreichte Welle 2) + Gold, dann Menü.
     expect(gsm.getState().meta.highestLevel).toBe(2);
-    expect(gsm.getState().run.phase).toBe('combat');
-    expect(gsm.getState().run.waveNumber).toBe(1);
-    expect(start).toHaveBeenLastCalledWith(SceneKey.Combat);
+    expect(gsm.getState().run.phase).toBe('gameover');
+    expect(gsm.getState().meta.currencies.gold).toBeGreaterThan(0);
+    expect(start).toHaveBeenLastCalledWith(SceneKey.Meta);
   });
 
   it('go() stoppt die aktive Szene vor dem Start der nächsten (kein Stacking)', () => {
     // Regression: game.scene.start() allein stoppt die Vorgaenger-Szene NICHT.
     const start = vi.fn();
     const stop = vi.fn();
-    // Simuliert: aktuell laeuft die Shop-Szene.
     const active = [{ scene: { key: 'Shop' } }];
     const fakeGame = {
       scene: { start, stop, getScenes: () => active },
@@ -103,10 +102,12 @@ describe('Loop-Integration — Durchklicken Kampf → Drop → Shop → Kampf', 
     const gsm = new GameStateManager(new InMemorySaveRepository());
     const coordinator = new RunCoordinator(fakeGame, gsm);
     coordinator.wire();
+    // Laufenden Run aufsetzen, damit ShopComplete nicht als Boss-Sieg gilt.
+    coordinator.startNewRun();
 
     eventBus.emit(GameEvent.ShopComplete, {});
     expect(stop).toHaveBeenCalledWith('Shop');
-    expect(start).toHaveBeenCalledWith(SceneKey.Combat);
+    expect(start).toHaveBeenLastCalledWith(SceneKey.Combat);
   });
 
   it('resumeOrStart routet an die gespeicherte Phase (Resume after reload)', () => {

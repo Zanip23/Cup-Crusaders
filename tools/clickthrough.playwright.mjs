@@ -110,6 +110,11 @@ async function main() {
       for (let i = 0; i < 3; i++) await page.click(`[data-testid="shop-card-${i}"]`).catch(() => {});
     };
 
+    // Hauptmenü → Run starten
+    await page.waitForSelector('[data-testid="meta-start-run"]');
+    await shot('00-meta-menu');
+    await page.click('[data-testid="meta-start-run"]');
+
     // Welle 1
     await waitPhase('combat');
     await page.waitForTimeout(1500);

@@ -56,8 +56,8 @@ export class CombatScene extends Phaser.Scene {
 
     new TopBar(this, 'KAMPF (Auto-Battler)', (g) => `🏐 ${selectBallsFromCombat(g.getState())}`);
 
-    // Held-StatEngine aus Basis-Stats + gekauften Run-Upgrades (wirken ab jetzt).
-    const hero = buildHeroStats(gsm.getState().run.upgrades);
+    // Held-StatEngine aus Basis + Meta (Items/Skills) + Run-Upgrades.
+    const hero = buildHeroStats(gsm.getState().run, gsm.getState().meta);
     this.heroMaxHp = hero.get(StatKey.MaxHp);
 
     const enemies = buildWave(WORLD_1, waveNumber);

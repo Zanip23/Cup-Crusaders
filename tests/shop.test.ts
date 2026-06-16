@@ -5,6 +5,13 @@ import { UPGRADES, UPGRADE_REGISTRY } from '@/content/upgrades';
 import { availableUpgrades, drawCards, scaledCost, weightOf } from '@/systems/shop/ShopPool';
 import { buildHeroStats } from '@/systems/combat/heroBuild';
 import { FLETCHER } from '@/content/heroes/fletcher';
+import { createInitialState } from '@/core/state/reducers';
+
+// Helfer: Held-Stats mit gegebenen Run-Upgrades und leerem Meta-Scope bauen.
+const withUpgrades = (upgrades: string[]) => {
+  const s = createInitialState();
+  return buildHeroStats({ ...s.run, upgrades }, s.meta);
+};
 
 describe('ShopPool — Pool, Gewichtung, Kosten (docs/06, docs/10)', () => {
   it('drawCards zieht 3 verschiedene Karten, seed-deterministisch', () => {
@@ -43,23 +50,23 @@ describe('ShopPool — Pool, Gewichtung, Kosten (docs/06, docs/10)', () => {
 
 describe('buildHeroStats — Upgrades wirken über die StatEngine (docs/06)', () => {
   it('ohne Upgrades = Basis-Stats des Helden', () => {
-    const e = buildHeroStats([]);
+    const e = withUpgrades([]);
     expect(e.get(StatKey.AttackDamage)).toBe(FLETCHER.baseStats[StatKey.AttackDamage]);
   });
 
   it('multishot erhöht ProjectileCount; vital_surge die MaxHp', () => {
-    const e = buildHeroStats(['multishot', 'vital_surge']);
+    const e = withUpgrades(['multishot', 'vital_surge']);
     expect(e.get(StatKey.ProjectileCount)).toBe(2); // base 1 + 1
     expect(e.get(StatKey.MaxHp)).toBe(150); // 120 × 1.25
   });
 
   it('wiederholte IDs stacken (multishot ×2 → ProjectileCount 3)', () => {
-    const e = buildHeroStats(['multishot', 'multishot']);
+    const e = withUpgrades(['multishot', 'multishot']);
     expect(e.get(StatKey.ProjectileCount)).toBe(3);
   });
 
   it('extra_ammo erhöht StartingBalls für den Drop', () => {
-    const e = buildHeroStats(['extra_ammo', 'extra_ammo']);
+    const e = withUpgrades(['extra_ammo', 'extra_ammo']);
     expect(e.get(StatKey.StartingBalls)).toBe(10);
   });
 });

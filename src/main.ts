@@ -11,6 +11,7 @@ declare global {
 import { RunCoordinator } from '@/core/RunCoordinator';
 import { provideGsm, provideCoordinator } from '@/core/registry';
 import { BootScene } from '@/scenes/BootScene';
+import { MetaScene } from '@/scenes/MetaScene';
 import { CombatScene } from '@/scenes/CombatScene';
 import { DropScene } from '@/scenes/DropScene';
 import { ShopScene } from '@/scenes/ShopScene';
@@ -30,7 +31,7 @@ function createGameConfig(): Phaser.Types.Core.GameConfig {
     pixelArt: true,
     roundPixels: true,
     physics: { default: 'arcade' }, // Matter wird pro-Scene (DropScene) aktiviert
-    scene: [BootScene, CombatScene, DropScene, ShopScene],
+    scene: [BootScene, MetaScene, CombatScene, DropScene, ShopScene],
   };
 }
 

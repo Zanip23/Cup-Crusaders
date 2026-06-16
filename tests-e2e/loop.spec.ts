@@ -38,6 +38,11 @@ test('zwei Wellen Auto-Battle → Drop → Shop, ohne Browser-Fehler', async ({ 
   const shot = async (name: string) =>
     testInfo.attach(name, { body: await page.screenshot(), contentType: 'image/png' });
 
+  // Hauptmenü → Run starten (Kampf ist Auto-Battle).
+  await page.waitForSelector('[data-testid="meta-start-run"]');
+  await shot('00-meta-menu');
+  await page.click('[data-testid="meta-start-run"]');
+
   await waitPhase(page, 'combat');
   await page.waitForTimeout(1500);
   await shot('01-combat-wave1');

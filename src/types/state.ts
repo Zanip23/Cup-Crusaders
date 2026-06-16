@@ -1,9 +1,11 @@
 // Zentrale State-Typen — Abbild von docs/09 (Game State & Persistenz).
 // Drei Scopes: meta (persistent), run (flüchtig), settings (persistent).
 
+import type { EquipSlot, ItemInstance } from './content';
+
 export type RunPhase = 'menu' | 'combat' | 'drop' | 'shop' | 'gameover';
 
-export type EquipSlot = 'weapon' | 'helmet' | 'armor' | 'gloves' | 'boots' | 'ring';
+export type { EquipSlot } from './content';
 
 /** Aktuelle Save-Schema-Version (Migration siehe SaveRepository / docs/09). */
 export const SAVE_VERSION = 1;
@@ -16,7 +18,7 @@ export interface MetaState {
   };
   // Inventar/Equip kommen in M5 (Meta-Progression) inhaltlich dazu;
   // Felder bleiben hier vorbereitet, damit die Save-Form stabil ist.
-  inventory: unknown[];
+  inventory: ItemInstance[];
   equipped: Partial<Record<EquipSlot, string | null>>;
   metaSkills: Record<string, number>;
   unlockedAbilities: string[];

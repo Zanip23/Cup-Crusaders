@@ -1,10 +1,47 @@
 // Content-Schemas (docs/08 §3). Subset für M2 (Kampf). Defs sind statischer,
 // per ID referenzierter Content; Instances (Laufzeit) liegen woanders.
 
-import type { StatKey, Modifier } from '@/core/stats/StatTypes';
+import type { StatKey, Modifier, ModifierOp } from '@/core/stats/StatTypes';
 
 /** Raritäten (5 Stufen, Common→Mythic, ADR-013). */
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+
+export const RARITIES: Rarity[] = ['common', 'rare', 'epic', 'legendary', 'mythic'];
+
+/** Skalierung auf den Basiseffekt (docs/07, docs/12). */
+export const RARITY_SCALE: Record<Rarity, number> = {
+  common: 1.0,
+  rare: 1.25,
+  epic: 1.6,
+  legendary: 2.0,
+  mythic: 2.4,
+};
+
+export type EquipSlot = 'weapon' | 'helmet' | 'armor' | 'gloves' | 'boots' | 'ring';
+
+export interface AffixDef {
+  stat: StatKey;
+  op: ModifierOp;
+  valueByRarity: Record<Rarity, number>;
+}
+
+/** "Bauplan" eines Item-Typs (statischer Content). */
+export interface ItemBaseDef {
+  id: string;
+  name: string;
+  slot: EquipSlot;
+  icon: string;
+  baseAffixes: AffixDef[];
+}
+
+/** Konkretes Item im Inventar (Spielerbesitz, gespeichert). */
+export interface ItemInstance {
+  instanceId: string;
+  baseId: string;
+  rarity: Rarity;
+  level: number;
+  rolledAffixes: Modifier[]; // optionale Zufalls-Affixe (MVP: leer)
+}
 
 export type EffectType =
   | 'addModifier'
