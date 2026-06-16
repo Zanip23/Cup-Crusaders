@@ -131,6 +131,13 @@ export interface PegDef {
   radius: number;
 }
 
+export interface BoardMotionDef {
+  type: 'horizontal' | 'vertical' | 'pingpong' | 'pulse';
+  amplitude: number;
+  durationMs: number;
+  phaseOffsetMs?: number;
+}
+
 export interface GateDef {
   x: number;
   y: number;
@@ -139,6 +146,7 @@ export interface GateDef {
   effect: Effect; // gateMultiply | gateAdd
   label: string;
   color?: number;
+  motion?: BoardMotionDef;
 }
 
 export interface BoardBumperDef {
@@ -170,6 +178,7 @@ export interface BoardPlatformDef {
   label: string;
   effect: Effect;
   color?: number;
+  motion?: BoardMotionDef;
 }
 
 export interface BoardBoosterDef {
@@ -181,6 +190,7 @@ export interface BoardBoosterDef {
   label: string;
   effect?: Effect;
   color?: number;
+  motion?: BoardMotionDef;
 }
 
 export interface BoardBlockerDef {
@@ -192,6 +202,7 @@ export interface BoardBlockerDef {
   label?: string;
   effect?: Effect;
   color?: number;
+  motion?: BoardMotionDef;
 }
 
 export interface BinDef {
