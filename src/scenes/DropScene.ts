@@ -24,6 +24,22 @@ const DRIP_INTERVAL_MS = 60;
 const SPIN_TIMEOUT_MS = 18000; // Timeout-Sicherung: Phase endet garantiert
 const CUP_Y = 180;
 
+const DROP_COLORS = {
+  caveTop: 0x07111f,
+  caveBottom: 0x05070d,
+  rockBack: 0x18334d,
+  rockMid: 0x0d2136,
+  rockFront: 0x071727,
+  glow: 0x38bdf8,
+  pinShadow: 0x02040a,
+  pinOuter: 0xd7f3ff,
+  pinCore: 0xffffff,
+  yellowGate: 0xf4c430,
+  greenGate: 0x36d66b,
+  blueGate: 0x4cc9f0,
+  binFill: 0x101f35,
+};
+
 export class DropScene extends Phaser.Scene {
   private board!: BoardDef;
   private resolver!: DropResolver;
@@ -45,7 +61,7 @@ export class DropScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.cameras.main.setBackgroundColor(COLORS.drop);
+    this.cameras.main.setBackgroundColor(DROP_COLORS.caveBottom);
     this.resetState();
 
     const gsm = getGsm(this);
@@ -94,60 +110,181 @@ export class DropScene extends Phaser.Scene {
 
   private buildBoard(): void {
     const m = this.matter;
+    this.buildStageBackground();
+
     // Wände + Floor (statisch, nicht-Sensor).
     m.add.rectangle(-10, GAME_HEIGHT / 2, 20, GAME_HEIGHT, { isStatic: true, label: 'wall' });
     m.add.rectangle(GAME_WIDTH + 10, GAME_HEIGHT / 2, 20, GAME_HEIGHT, { isStatic: true, label: 'wall' });
     m.add.rectangle(CENTER_X, GAME_HEIGHT - 30, GAME_WIDTH, 20, { isStatic: true, label: 'wall' });
 
-    // Pegs.
+    // Pegs als glänzende Pins.
     for (const peg of this.board.pegs) {
       m.add.circle(peg.x, peg.y, peg.radius, {
         isStatic: true,
         restitution: this.board.defaultRestitution,
         label: 'peg',
       });
-      this.add.circle(peg.x, peg.y, peg.radius, 0xffffff, 0.65);
+      this.add.circle(peg.x + 4, peg.y + 6, peg.radius + 8, DROP_COLORS.pinShadow, 0.45).setDepth(2);
+      this.add.circle(peg.x, peg.y, peg.radius + 5, DROP_COLORS.pinOuter, 0.92).setDepth(3);
+      this.add.circle(peg.x, peg.y, peg.radius + 1, DROP_COLORS.pinCore, 0.98).setDepth(4);
+      this.add.circle(peg.x - 4, peg.y - 4, Math.max(3, peg.radius * 0.38), 0xffffff, 0.95).setDepth(5);
     }
 
-    // Tore (Sensoren) + Label.
+    // Tore (Sensoren) als breite, farbige Multiplikator-Balken.
     this.board.gates.forEach((g, i) => {
       m.add.rectangle(g.x, g.y, g.w, g.h, { isStatic: true, isSensor: true, label: `gate:${i}` });
-      this.add.rectangle(g.x, g.y, g.w, g.h, 0x4cc9f0, 0.35).setStrokeStyle(2, 0x4cc9f0);
-      this.add.text(g.x, g.y, g.label, { fontSize: '18px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+      const fill = this.gateColor(g.label);
+      this.add.rectangle(g.x + 7, g.y + 8, g.w + 18, g.h + 12, DROP_COLORS.pinShadow, 0.42).setDepth(6);
+      this.add.rectangle(g.x, g.y, g.w + 12, g.h + 10, fill, 0.95).setStrokeStyle(6, 0xffffff, 0.9).setDepth(7);
+      this.add.rectangle(g.x, g.y - g.h * 0.2, g.w - 10, Math.max(8, g.h * 0.24), 0xffffff, 0.24).setDepth(8);
+      this.add
+        .text(g.x, g.y + 1, g.label, {
+          fontSize: '32px',
+          color: '#ffffff',
+          fontStyle: 'bold',
+          stroke: '#182034',
+          strokeThickness: 6,
+        })
+        .setOrigin(0.5)
+        .setDepth(9);
     });
 
-    // Bins (Sensoren) + Trennwände + Label.
+    // Bins (Sensoren) + Trennwände + starke Multiplikator-Labels.
     const binTop = GAME_HEIGHT - 360;
     const sensorY = binTop + 40;
     this.board.bins.forEach((b, i) => {
       const cx = b.x + b.w / 2;
       m.add.rectangle(cx, sensorY, b.w - 6, 70, { isStatic: true, isSensor: true, label: `bin:${i}` });
       const jackpot = b.multiplier >= 10;
+      const fill = jackpot ? DROP_COLORS.yellowGate : DROP_COLORS.binFill;
+      this.add.rectangle(cx + 6, sensorY + 8, b.w - 8, 104, 0x000000, 0.36).setDepth(6);
+      this.add.rectangle(cx, sensorY, b.w - 12, 98, fill, jackpot ? 0.88 : 0.82).setStrokeStyle(5, jackpot ? 0xffffff : DROP_COLORS.blueGate, 0.92).setDepth(7);
+      this.add.rectangle(cx, sensorY - 34, b.w - 24, 12, 0xffffff, jackpot ? 0.34 : 0.16).setDepth(8);
       this.add
-        .rectangle(cx, sensorY, b.w - 6, 90, jackpot ? 0x7a4dbf : COLORS.shop, jackpot ? 0.5 : 0.6)
-        .setStrokeStyle(2, jackpot ? 0xf4c430 : 0xffffff, 0.6);
-      this.add
-        .text(cx, sensorY, b.label, { fontSize: jackpot ? '30px' : '22px', color: jackpot ? '#f4c430' : COLORS.text, fontStyle: 'bold' })
-        .setOrigin(0.5);
+        .text(cx, sensorY, b.label, {
+          fontSize: jackpot ? '36px' : '28px',
+          color: '#ffffff',
+          fontStyle: 'bold',
+          stroke: jackpot ? '#5c3400' : '#06111f',
+          strokeThickness: 7,
+        })
+        .setOrigin(0.5)
+        .setDepth(9);
       // Trennwand zwischen Bins (physisch), kanalisiert die Bälle.
       if (i > 0) {
         m.add.rectangle(b.x, binTop - 30, 6, 80, { isStatic: true, label: 'wall' });
+        this.add.rectangle(b.x, binTop - 30, 8, 86, 0xffffff, 0.62).setDepth(8);
       }
     });
   }
 
+  private buildStageBackground(): void {
+    const bg = this.add.graphics().setDepth(-20);
+    bg.fillGradientStyle(DROP_COLORS.caveTop, DROP_COLORS.caveTop, DROP_COLORS.caveBottom, DROP_COLORS.caveBottom, 1);
+    bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+    this.drawRockLayer(DROP_COLORS.rockBack, 0.42, 95, 0, -16);
+    this.drawRockLayer(DROP_COLORS.rockMid, 0.58, 135, 42, -12);
+    this.drawRockLayer(DROP_COLORS.rockFront, 0.76, 185, 84, -8);
+
+    const glow = this.add.graphics().setDepth(-9);
+    glow.fillStyle(DROP_COLORS.glow, 0.11);
+    glow.fillEllipse(CENTER_X, 520, GAME_WIDTH * 0.82, 760);
+    glow.fillStyle(0xffffff, 0.05);
+    glow.fillEllipse(CENTER_X, 300, GAME_WIDTH * 0.42, 260);
+
+    const vignette = this.add.graphics().setDepth(-8);
+    vignette.fillStyle(0x000000, 0.34);
+    vignette.fillRect(0, 0, 54, GAME_HEIGHT);
+    vignette.fillRect(GAME_WIDTH - 54, 0, 54, GAME_HEIGHT);
+    vignette.fillStyle(0x000000, 0.2);
+    vignette.fillRect(0, 0, GAME_WIDTH, 88);
+    vignette.fillRect(0, GAME_HEIGHT - 190, GAME_WIDTH, 190);
+
+    for (let i = 0; i < 70; i += 1) {
+      const x = Phaser.Math.Between(22, GAME_WIDTH - 22);
+      const y = Phaser.Math.Between(105, GAME_HEIGHT - 235);
+      const radius = Phaser.Math.FloatBetween(1.1, 2.7);
+      const alpha = Phaser.Math.FloatBetween(0.08, 0.28);
+      this.add.circle(x, y, radius, 0xe8f5ff, alpha).setDepth(-7);
+    }
+  }
+
+  private drawRockLayer(color: number, alpha: number, height: number, offset: number, depth: number): void {
+    const g = this.add.graphics().setDepth(depth);
+    g.fillStyle(color, alpha);
+    g.beginPath();
+    g.moveTo(0, GAME_HEIGHT);
+    for (let x = 0; x <= GAME_WIDTH + 90; x += 90) {
+      const y = GAME_HEIGHT - height - Phaser.Math.Between(0, 90) - ((x + offset) % 180 === 0 ? 42 : 0);
+      g.lineTo(x, y);
+    }
+    g.lineTo(GAME_WIDTH, GAME_HEIGHT);
+    g.closePath();
+    g.fillPath();
+  }
+
+  private gateColor(label: string): number {
+    if (label.includes('4')) return DROP_COLORS.blueGate;
+    if (label.includes('3')) return DROP_COLORS.greenGate;
+    return DROP_COLORS.yellowGate;
+  }
+
   private buildCup(): void {
-    const body = this.add.rectangle(0, 0, 96, 40, COLORS.accent).setStrokeStyle(3, 0xffffff);
+    const shadow = this.add.graphics();
+    shadow.fillStyle(0x000000, 0.35);
+    shadow.fillPoints(
+      [
+        new Phaser.Geom.Point(-58, -17),
+        new Phaser.Geom.Point(58, -17),
+        new Phaser.Geom.Point(43, 31),
+        new Phaser.Geom.Point(-43, 31),
+      ],
+      true,
+    );
+    shadow.setPosition(7, 9);
+
+    const body = this.add.graphics();
+    body.fillGradientStyle(COLORS.accent, COLORS.accent, 0x8f2038, 0x8f2038, 1);
+    body.fillPoints(
+      [
+        new Phaser.Geom.Point(-56, -18),
+        new Phaser.Geom.Point(56, -18),
+        new Phaser.Geom.Point(40, 30),
+        new Phaser.Geom.Point(-40, 30),
+      ],
+      true,
+    );
+    body.lineStyle(5, 0xffffff, 0.95);
+    body.strokePoints(
+      [
+        new Phaser.Geom.Point(-56, -18),
+        new Phaser.Geom.Point(56, -18),
+        new Phaser.Geom.Point(40, 30),
+        new Phaser.Geom.Point(-40, 30),
+      ],
+      true,
+    );
+
+    const rim = this.add.ellipse(0, -20, 124, 24, 0xffffff, 0.96).setStrokeStyle(3, 0xd7f3ff, 0.95);
+    const innerRim = this.add.ellipse(0, -20, 100, 12, 0x6d1b31, 0.34);
+    const shine = this.add.rectangle(-24, -1, 13, 35, 0xffffff, 0.22).setRotation(0.16);
     this.cupAmmoText = this.add
-      .text(0, 0, `${this.ammo}`, { fontSize: '20px', color: '#ffffff', fontStyle: 'bold' })
+      .text(0, 7, `${this.ammo}`, {
+        fontSize: '30px',
+        color: '#ffffff',
+        fontStyle: 'bold',
+        stroke: '#6d1b31',
+        strokeThickness: 6,
+      })
       .setOrigin(0.5);
-    this.cup = this.add.container(CENTER_X, CUP_Y, [body, this.cupAmmoText]);
-    this.cup.setSize(96, 40);
+    this.cup = this.add.container(CENTER_X, CUP_Y, [shadow, body, rim, innerRim, shine, this.cupAmmoText]).setDepth(20);
+    this.cup.setSize(124, 64);
     this.cup.setInteractive({ useHandCursor: true, draggable: true });
 
     // Drag (horizontal) ...
     this.input.on('drag', (_p: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject, dragX: number) => {
-      if (obj === this.cup) this.cup.x = Phaser.Math.Clamp(dragX, 60, GAME_WIDTH - 60);
+      if (obj === this.cup) this.cup.x = Phaser.Math.Clamp(dragX, 70, GAME_WIDTH - 70);
     });
     // ... und Tap auf den Becher = ausschütten (Alternative zur Drag-Bedienung).
     this.cup.on('pointerup', () => this.release());
@@ -165,7 +302,7 @@ export class DropScene extends Phaser.Scene {
   }
 
   private nudgeCup(dx: number): void {
-    this.cup.x = Phaser.Math.Clamp(this.cup.x + dx, 60, GAME_WIDTH - 60);
+    this.cup.x = Phaser.Math.Clamp(this.cup.x + dx, 70, GAME_WIDTH - 70);
   }
 
   // Tastatur als zusätzliche Eingabe (A11y/Desktop): ←/→ bewegen, Leer/Enter schüttet aus.
@@ -276,11 +413,14 @@ export class DropScene extends Phaser.Scene {
   private floatingContribution(x: number, y: number, amount: number, jackpot: boolean): void {
     const t = this.add
       .text(x, y, `+${amount}`, {
-        fontSize: jackpot ? '28px' : '18px',
-        color: jackpot ? '#f4c430' : '#ffffff',
+        fontSize: jackpot ? '34px' : '22px',
+        color: jackpot ? '#fff4a3' : '#ffffff',
         fontStyle: 'bold',
+        stroke: jackpot ? '#6b3f00' : '#0b1324',
+        strokeThickness: jackpot ? 7 : 5,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(30);
     this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 600, onComplete: () => t.destroy() });
   }
 
