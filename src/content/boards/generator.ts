@@ -25,6 +25,33 @@ const PEG_RADIUS = 7;
 const BIN_COUNT = 5;
 const MAX_CONCURRENT_BALLS = 200;
 
+export const GATE_COSTS = {
+  add: 9,
+  multiply: 16,
+  multiplierStep: 7,
+  addStep: 1,
+} as const;
+export const PLATFORM_COSTS = {
+  add: 11,
+  multiply: 19,
+  multiplierStep: 8,
+  addStep: 1,
+  widthDiscountThreshold: 190,
+  wideDiscount: 4,
+} as const;
+export const BOOSTER_COST = 18;
+export const MYSTERY_COST = 14;
+export const BLOCKER_RISK_CREDIT = 8;
+export const MAX_MULTIPLIER_BY_DIFFICULTY: ReadonlyArray<{
+  maxDifficulty: number;
+  multiplier: number;
+}> = [
+  { maxDifficulty: 3, multiplier: 3 },
+  { maxDifficulty: 6, multiplier: 4 },
+  { maxDifficulty: 9, multiplier: 5 },
+  { maxDifficulty: Number.POSITIVE_INFINITY, multiplier: 6 },
+];
+
 type PatternName = 'balanced' | 'zigzag' | 'centerRisk' | 'wideChaos';
 
 interface PatternTemplate {
@@ -164,9 +191,22 @@ function buildPegs(rng: Rng, challenge: number): PegDef[] {
   return pegs;
 }
 
-function effectValue(kind: 'multiply' | 'add', challenge: number, rng: Rng): number {
-  if (kind === 'multiply')
-    return clamp(2 + Math.floor((challenge + rng.intBetween(0, 2)) / 4), 2, 5);
+function maxMultiplierForDifficulty(challenge: number): number {
+  return (
+    MAX_MULTIPLIER_BY_DIFFICULTY.find((entry) => challenge <= entry.maxDifficulty)?.multiplier ?? 5
+  );
+}
+
+function effectValue(kind: 'multiply' | 'add', challenge: number, rng: Rng, riskScore = 0): number {
+  if (kind === 'multiply') {
+    const riskBonus = riskScore >= 5 ? 1 : 0;
+    const safePenalty = riskScore <= 2 ? 1 : 0;
+    return clamp(
+      2 + Math.floor((challenge + rng.intBetween(0, 2)) / 4) + riskBonus - safePenalty,
+      2,
+      maxMultiplierForDifficulty(challenge),
+    );
+  }
   return clamp(3 + challenge + rng.intBetween(0, 3), 4, 16);
 }
 
@@ -176,24 +216,85 @@ function effectFor(kind: 'multiply' | 'add', value: number) {
     : { type: 'gateAdd' as const, params: { amount: value } };
 }
 
-function buildPatternObjects(pattern: PatternTemplate, rng: Rng, challenge: number) {
-  const gates: GateDef[] = pattern.gateSlots.map((slot) => {
-    const value = effectValue(slot.kind, challenge, rng);
+export function buildBoardBudget(difficulty: number, wave: number, chapter: number): number {
+  const challenge = scaledDifficulty(difficulty, wave);
+  const chapterBonus = Math.max(0, chapter - 1) * 10;
+  return 54 + challenge * 7 + chapterBonus;
+}
+
+function slotRiskScore(
+  slot: { xRatio: number; y: number; w?: number },
+  blockerCount: number,
+): number {
+  const centerRisk = 1 - Math.min(1, Math.abs(slot.xRatio - 0.5) / 0.5);
+  const depthRisk = clamp((slot.y - SAFE_TOP_Y) / (SAFE_BOTTOM_Y - SAFE_TOP_Y), 0, 1);
+  const narrowRisk = slot.w ? clamp((210 - slot.w) / 90, 0, 1) : 0.45;
+  return centerRisk * 3 + depthRisk * 2 + narrowRisk * 2 + blockerCount * 0.5;
+}
+
+function gateCost(kind: 'multiply' | 'add', value: number): number {
+  if (kind === 'multiply') return GATE_COSTS.multiply + (value - 2) * GATE_COSTS.multiplierStep;
+  return GATE_COSTS.add + Math.max(0, value - 4) * GATE_COSTS.addStep;
+}
+
+function platformCost(kind: 'multiply' | 'add', value: number, width: number): number {
+  const base =
+    kind === 'multiply'
+      ? PLATFORM_COSTS.multiply + (value - 2) * PLATFORM_COSTS.multiplierStep
+      : PLATFORM_COSTS.add + Math.max(0, value - 4) * PLATFORM_COSTS.addStep;
+  return Math.max(
+    1,
+    base - (width >= PLATFORM_COSTS.widthDiscountThreshold ? PLATFORM_COSTS.wideDiscount : 0),
+  );
+}
+
+function spendBudget(budget: { remaining: number }, cost: number): boolean {
+  if (budget.remaining < cost) return false;
+  budget.remaining -= cost;
+  return true;
+}
+
+function buildPatternObjects(
+  pattern: PatternTemplate,
+  rng: Rng,
+  challenge: number,
+  budgetLimit: number,
+) {
+  const budget = { remaining: budgetLimit + pattern.blockerSlots.length * BLOCKER_RISK_CREDIT };
+  const blockerCount = pattern.blockerSlots.length;
+
+  const gateCandidates = pattern.gateSlots
+    .map((slot) => ({ slot, riskScore: slotRiskScore(slot, blockerCount) }))
+    .sort((a, b) => b.riskScore - a.riskScore);
+  const gates: GateDef[] = [];
+  for (const { slot, riskScore } of gateCandidates) {
+    const value = effectValue(slot.kind, challenge, rng, riskScore);
+    if (!spendBudget(budget, gateCost(slot.kind, value))) continue;
     const prefix = slot.kind === 'multiply' ? 'x' : '+';
-    return {
+    gates.push({
       x: Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 18)),
       y: clamp(slot.y + jitter(rng, 18), SAFE_TOP_Y, SAFE_BOTTOM_Y),
       w: 76,
       h: 24,
       label: `${prefix}${value}`,
       effect: effectFor(slot.kind, value),
-    };
-  });
+    });
+  }
 
-  const platforms: BoardPlatformDef[] = pattern.platformSlots.map((slot) => {
-    const value = effectValue(slot.labelKind, challenge, rng);
+  const platformCandidates = pattern.platformSlots
+    .map((slot) => ({ slot, riskScore: slotRiskScore(slot, blockerCount) }))
+    .sort((a, b) => {
+      if (a.slot.labelKind !== b.slot.labelKind) return a.slot.labelKind === 'multiply' ? -1 : 1;
+      return a.slot.labelKind === 'multiply'
+        ? b.riskScore - a.riskScore
+        : a.riskScore - b.riskScore;
+    });
+  const platforms: BoardPlatformDef[] = [];
+  for (const { slot, riskScore } of platformCandidates) {
+    const value = effectValue(slot.labelKind, challenge, rng, riskScore);
+    if (!spendBudget(budget, platformCost(slot.labelKind, value, slot.w))) continue;
     const prefix = slot.labelKind === 'multiply' ? 'x' : '+';
-    return {
+    platforms.push({
       x: Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 20)),
       y: clamp(slot.y + jitter(rng, 16), SAFE_TOP_Y, SAFE_BOTTOM_Y),
       w: slot.w,
@@ -202,8 +303,8 @@ function buildPatternObjects(pattern: PatternTemplate, rng: Rng, challenge: numb
       label: `${prefix}${value}`,
       effect: effectFor(slot.labelKind, value),
       color: slot.labelKind === 'multiply' ? 0xf4c430 : 0x36d66b,
-    };
-  });
+    });
+  }
 
   const ramps: BoardRampDef[] = pattern.rampSlots.map((slot) => ({
     x: Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 14)),
@@ -215,16 +316,20 @@ function buildPatternObjects(pattern: PatternTemplate, rng: Rng, challenge: numb
     color: 0xd7f3ff,
   }));
 
-  const boosters: BoardBoosterDef[] = pattern.boosterSlots.map((slot) => ({
-    x: Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 16)),
-    y: clamp(slot.y + jitter(rng, 16), SAFE_TOP_Y, SAFE_BOTTOM_Y),
-    w: 106,
-    h: 40,
-    angle: slot.angle ?? 0,
-    label: 'BOOST',
-    effect: effectFor('add', clamp(2 + Math.floor(challenge / 2), 3, 8)),
-    color: 0xff4fd8,
-  }));
+  const boosters: BoardBoosterDef[] = [];
+  for (const slot of pattern.boosterSlots) {
+    if (!spendBudget(budget, BOOSTER_COST)) continue;
+    boosters.push({
+      x: Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 16)),
+      y: clamp(slot.y + jitter(rng, 16), SAFE_TOP_Y, SAFE_BOTTOM_Y),
+      w: 106,
+      h: 40,
+      angle: slot.angle ?? 0,
+      label: 'BOOST',
+      effect: effectFor('add', clamp(2 + Math.floor(challenge / 2), 3, 8)),
+      color: 0xff4fd8,
+    });
+  }
 
   const blockers: BoardBlockerDef[] = pattern.blockerSlots.map((slot) => ({
     x: Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 10)),
@@ -239,19 +344,32 @@ function buildPatternObjects(pattern: PatternTemplate, rng: Rng, challenge: numb
   return { gates, platforms, ramps, boosters, blockers };
 }
 
-function buildBins(challenge: number, rng: Rng): BinDef[] {
+function buildBins(challenge: number, rng: Rng, budgetLimit: number): BinDef[] {
   const binW = GAME_WIDTH / BIN_COUNT;
   const jackpot = clamp(8 + Math.floor(challenge / 2) + rng.intBetween(0, 2), 8, 16);
   const shoulder = clamp(3 + Math.floor(challenge / 3), 3, 7);
   const outer = challenge >= 8 ? 0.5 : 1;
   const multipliers = [outer, shoulder, jackpot, shoulder, outer];
 
-  return multipliers.map((multiplier, index) => ({
-    x: index * binW,
-    w: binW,
-    multiplier,
-    label: `x${multiplier}`,
-  }));
+  let remaining = Math.max(0, Math.floor(budgetLimit * 0.2));
+
+  return multipliers.map((multiplier, index) => {
+    const bin: BinDef = {
+      x: index * binW,
+      w: binW,
+      multiplier,
+      label: `x${multiplier}`,
+    };
+
+    const isRiskyJackpot = index === Math.floor(BIN_COUNT / 2) && multiplier === jackpot;
+    if (isRiskyJackpot && remaining >= MYSTERY_COST && challenge >= 5) {
+      remaining -= MYSTERY_COST;
+      bin.special = effectFor('add', clamp(2 + Math.floor(challenge / 2), 4, 9));
+      bin.label = `${bin.label} ?`;
+    }
+
+    return bin;
+  });
 }
 
 /**
@@ -259,23 +377,29 @@ function buildBins(challenge: number, rng: Rng): BinDef[] {
  * Gleiche Eingaben liefern immer dasselbe Layout; Difficulty und Wave erhöhen
  * Peg-Dichte, Varianz und Bonuswerte schrittweise.
  */
-export function generateBoard(seed: number, difficulty: number, wave: number): BoardDef {
+export function generateBoard(
+  seed: number,
+  difficulty: number,
+  wave: number,
+  chapter = 1,
+): BoardDef {
   const rng = new Rng(
     (seed ^ Math.imul(difficulty, 0x45d9f3b) ^ Math.imul(wave, 0x119de1f3)) >>> 0,
   );
   const challenge = scaledDifficulty(difficulty, wave);
   const pattern = PATTERNS[rng.intBetween(0, PATTERNS.length - 1)];
-  const patternObjects = buildPatternObjects(pattern, rng, challenge);
+  const budget = buildBoardBudget(difficulty, wave, chapter);
+  const patternObjects = buildPatternObjects(pattern, rng, challenge, budget);
 
   return {
-    id: `board_generated_${seed}_${difficulty}_${wave}_${pattern.name}`,
+    id: `board_generated_${seed}_${difficulty}_${wave}_${chapter}_${pattern.name}`,
     width: GAME_WIDTH,
     height: BOARD_HEIGHT,
     gravity: 1,
     defaultRestitution: clamp(0.48 + challenge * 0.01, 0.5, 0.62),
     pegs: buildPegs(rng, challenge),
     ...patternObjects,
-    bins: buildBins(challenge, rng),
+    bins: buildBins(challenge, rng, budget),
     maxConcurrentBalls: MAX_CONCURRENT_BALLS,
   };
 }
