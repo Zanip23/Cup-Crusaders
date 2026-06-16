@@ -66,9 +66,28 @@ steht, der 3-Phasen-Loop ist „leer" durchklickbar und der `transfer`-Kanal
 npm install      # Abhängigkeiten installieren
 npm run dev      # Dev-Server (Vite, HMR) → http://localhost:5173
 npm run build    # Typecheck + Production-Build nach dist/
-npm test         # Vitest (reine Logik: Reducer, Rng)
+npm test         # Vitest (reine Logik: Reducer, Rng, Loop-Integration)
 npm run lint     # ESLint
 ```
+
+### Visueller Smoke-Test (echter Browser)
+
+`tools/clickthrough.mjs` klickt den kompletten Loop in Headless-Chromium durch
+(zwei Wellen inkl. zweitem Shop-Besuch) und legt Screenshots ab. Er sammelt
+Konsolenfehler als Pass/Fail-Signal — so wurde u. a. der Szenen-Stacking-Bug
+gefunden.
+
+```bash
+# Terminal 1
+npm run dev
+# Terminal 2
+npm run clickthrough          # Screenshots → /tmp/shots (oder OUT=… setzen)
+```
+
+> Nutzt `puppeteer-core` + `@sparticuz/chromium` (npm-gebündelter Chromium-Binary)
+> statt Playwright, weil die Playwright-Browser-CDN in der CI-/Web-Umgebung
+> blockiert ist. Auf manchen Distributionen werden zusätzlich System-Libs
+> (z. B. `libnss3`) benötigt.
 
 ### Was in M1 steht
 
