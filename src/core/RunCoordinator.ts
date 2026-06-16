@@ -90,6 +90,12 @@ export class RunCoordinator {
   }
 
   private go(key: string): void {
-    this.game.scene.start(key);
+    // WICHTIG: game.scene (SceneManager).start() stoppt die vorherige Szene NICHT
+    // — es würde Szenen uebereinander stapeln. Daher erst alle aktiven Szenen
+    // stoppen, dann die Ziel-Szene starten (entspricht dem Verhalten von
+    // scene.scene.start() innerhalb einer Szene).
+    const mgr = this.game.scene;
+    mgr.getScenes(true).forEach((s) => mgr.stop(s.scene.key));
+    mgr.start(key);
   }
 }

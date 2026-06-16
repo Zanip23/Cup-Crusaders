@@ -10,7 +10,11 @@ import { InMemorySaveRepository } from '@/core/save/SaveRepository';
 // genau die Events, die die Platzhalter-Buttons der Szenen feuern.
 function makeHarness() {
   const start = vi.fn();
-  const fakeGame = { scene: { start } } as unknown as Phaser.Game;
+  // Fake-SceneManager: go() stoppt aktive Szenen und startet die Ziel-Szene.
+  // Ohne real laufende Szenen liefert getScenes(true) eine leere Liste.
+  const fakeGame = {
+    scene: { start, stop: vi.fn(), getScenes: () => [] },
+  } as unknown as Phaser.Game;
   const gsm = new GameStateManager(new InMemorySaveRepository());
   const coordinator = new RunCoordinator(fakeGame, gsm);
   coordinator.wire();
@@ -82,6 +86,24 @@ describe('Loop-Integration — Durchklicken Kampf → Drop → Shop → Kampf', 
     expect(gsm.getState().run.phase).toBe('combat');
     expect(gsm.getState().run.waveNumber).toBe(1);
     expect(start).toHaveBeenLastCalledWith(SceneKey.Combat);
+  });
+
+  it('go() stoppt die aktive Szene vor dem Start der nächsten (kein Stacking)', () => {
+    // Regression: game.scene.start() allein stoppt die Vorgaenger-Szene NICHT.
+    const start = vi.fn();
+    const stop = vi.fn();
+    // Simuliert: aktuell laeuft die Shop-Szene.
+    const active = [{ scene: { key: 'Shop' } }];
+    const fakeGame = {
+      scene: { start, stop, getScenes: () => active },
+    } as unknown as Phaser.Game;
+    const gsm = new GameStateManager(new InMemorySaveRepository());
+    const coordinator = new RunCoordinator(fakeGame, gsm);
+    coordinator.wire();
+
+    eventBus.emit(GameEvent.ShopComplete, {});
+    expect(stop).toHaveBeenCalledWith('Shop');
+    expect(start).toHaveBeenCalledWith(SceneKey.Combat);
   });
 
   it('resumeOrStart routet an die gespeicherte Phase (Resume after reload)', () => {
