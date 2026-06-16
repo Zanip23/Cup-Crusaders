@@ -194,7 +194,10 @@ export function validateContent(): string[] {
 
   // 2. Level: referenzielle Integrität + Sanity.
   for (const level of Object.values(LEVEL_REGISTRY)) {
-    if (!BOARD_REGISTRY[level.boardId])
+    const boardId = level.boardSelection?.boardId ?? level.boardId;
+    if (level.boardSelection?.mode === 'fixed' && (!boardId || !BOARD_REGISTRY[boardId]))
+      err(`Level '${level.id}': unbekanntes fixes boardId '${String(boardId)}'`);
+    if (level.boardId && !BOARD_REGISTRY[level.boardId])
       err(`Level '${level.id}': unbekanntes boardId '${level.boardId}'`);
     if (!SCALING_REGISTRY[level.scalingProfileId])
       err(`Level '${level.id}': unbekanntes scalingProfileId '${level.scalingProfileId}'`);
