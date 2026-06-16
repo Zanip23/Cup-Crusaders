@@ -120,35 +120,40 @@ export function gateColor(label: string): number {
   return DROP_COLORS.yellowGate;
 }
 
-export function renderGate(scene: Phaser.Scene, gate: BoardDef['gates'][number]): void {
+export function renderGate(
+  scene: Phaser.Scene,
+  gate: BoardDef['gates'][number],
+): Phaser.GameObjects.Container {
   const fill = gate.color ?? gateColor(gate.label);
-  scene.add
-    .rectangle(gate.x + 7, gate.y + 8, gate.w + 18, gate.h + 12, DROP_COLORS.pinShadow, 0.42)
-    .setDepth(6);
-  scene.add
-    .rectangle(gate.x, gate.y, gate.w + 12, gate.h + 10, fill, 0.95)
-    .setStrokeStyle(6, 0xffffff, 0.9)
-    .setDepth(7);
-  scene.add
-    .rectangle(
-      gate.x,
-      gate.y - gate.h * 0.2,
-      gate.w - 10,
-      Math.max(8, gate.h * 0.24),
-      0xffffff,
-      0.24,
-    )
-    .setDepth(8);
-  scene.add
-    .text(gate.x, gate.y + 1, gate.label, {
-      fontSize: '32px',
-      color: '#ffffff',
-      fontStyle: 'bold',
-      stroke: '#182034',
-      strokeThickness: 6,
-    })
-    .setOrigin(0.5)
-    .setDepth(9);
+  const container = scene.add.container(gate.x, gate.y);
+  container.add(
+    scene.add.rectangle(7, 8, gate.w + 18, gate.h + 12, DROP_COLORS.pinShadow, 0.42).setDepth(6),
+  );
+  container.add(
+    scene.add
+      .rectangle(0, 0, gate.w + 12, gate.h + 10, fill, 0.95)
+      .setStrokeStyle(6, 0xffffff, 0.9)
+      .setDepth(7),
+  );
+  container.add(
+    scene.add
+      .rectangle(0, -gate.h * 0.2, gate.w - 10, Math.max(8, gate.h * 0.24), 0xffffff, 0.24)
+      .setDepth(8),
+  );
+  container.add(
+    scene.add
+      .text(0, 1, gate.label, {
+        fontSize: '32px',
+        color: '#ffffff',
+        fontStyle: 'bold',
+        stroke: '#182034',
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5)
+      .setDepth(9),
+  );
+  container.setDepth(9);
+  return container;
 }
 
 export function renderFunnelRail(
