@@ -40,6 +40,11 @@ const DROP_COLORS = {
   greenGate: 0x36d66b,
   blueGate: 0x4cc9f0,
   binFill: 0x101f35,
+  funnelWood: 0x9a6738,
+  funnelWoodLight: 0xd6a15a,
+  funnelMetal: 0xb8c7d9,
+  jackpotGlow: 0xffd166,
+  nearMiss: 0xff8c42,
 };
 
 export class DropScene extends Phaser.Scene {
@@ -274,42 +279,160 @@ export class DropScene extends Phaser.Scene {
         .setDepth(9);
     });
 
-    // Bins (Sensoren) + Trennwände + starke Multiplikator-Labels.
+    // Funnel-Catcher: sichtbare Rampen, Pins und Sensoren bilden dieselbe Geometrie ab.
     const binTop = GAME_HEIGHT - 360;
-    const sensorY = binTop + 40;
+    const throatY = binTop - 26;
+    const sensorY = binTop + 58;
+    const binBottom = GAME_HEIGHT - 92;
+    const binCenters = this.board.bins.map((b) => b.x + b.w / 2);
+    const jackpotIndex = this.board.bins.reduce(
+      (best, bin, i) => (bin.multiplier > this.board.bins[best].multiplier ? i : best),
+      0,
+    );
+    const jackpotCenter = binCenters[jackpotIndex] ?? CENTER_X;
+
+    const funnelBack = this.add.graphics().setDepth(5);
+    funnelBack.fillStyle(0x06111f, 0.78);
+    funnelBack.fillRoundedRect(18, binTop - 96, GAME_WIDTH - 36, 212, 24);
+    funnelBack.lineStyle(4, 0xd7f3ff, 0.25);
+    funnelBack.strokeRoundedRect(18, binTop - 96, GAME_WIDTH - 36, 212, 24);
+
+    this.addFunnelRail(66, binTop - 110, 210, 24, -24, DROP_COLORS.funnelWoodLight, 'wall');
+    this.addFunnelRail(
+      GAME_WIDTH - 66,
+      binTop - 110,
+      210,
+      24,
+      24,
+      DROP_COLORS.funnelWoodLight,
+      'wall',
+    );
+    this.addFunnelRail(142, binTop - 18, 178, 20, -14, DROP_COLORS.funnelWood, 'wall');
+    this.addFunnelRail(GAME_WIDTH - 142, binTop - 18, 178, 20, 14, DROP_COLORS.funnelWood, 'wall');
+
+    const jackpotGlow = this.add
+      .circle(jackpotCenter, sensorY, 92, DROP_COLORS.jackpotGlow, 0.2)
+      .setDepth(6);
+    this.tweens.add({
+      targets: jackpotGlow,
+      scale: { from: 0.9, to: 1.18 },
+      alpha: { from: 0.16, to: 0.34 },
+      duration: 1050,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
     this.board.bins.forEach((b, i) => {
       const cx = b.x + b.w / 2;
-      m.add.rectangle(cx, sensorY, b.w - 6, 70, {
+      const jackpot = i === jackpotIndex;
+      const safeEdge = i === 0 || i === this.board.bins.length - 1;
+      const sensorW = b.w - (jackpot ? 2 : 10);
+      m.add.rectangle(cx, sensorY, sensorW, 92, {
         isStatic: true,
         isSensor: true,
         label: `bin:${i}`,
       });
-      const jackpot = b.multiplier >= 10;
-      const fill = jackpot ? DROP_COLORS.yellowGate : DROP_COLORS.binFill;
-      this.add.rectangle(cx + 6, sensorY + 8, b.w - 8, 104, 0x000000, 0.36).setDepth(6);
+
+      const fill = jackpot ? DROP_COLORS.yellowGate : safeEdge ? 0x153958 : DROP_COLORS.binFill;
+      const slot = this.add.graphics().setDepth(7);
+      slot.fillStyle(0x000000, 0.32);
+      slot.fillRoundedRect(cx - sensorW / 2 + 5, sensorY - 42 + 8, sensorW - 10, 124, 18);
+      slot.fillStyle(fill, jackpot ? 0.9 : 0.82);
+      slot.fillRoundedRect(cx - sensorW / 2, sensorY - 42, sensorW, 124, jackpot ? 22 : 16);
+      slot.lineStyle(
+        jackpot ? 6 : 4,
+        jackpot ? 0xffffff : DROP_COLORS.blueGate,
+        jackpot ? 0.95 : 0.72,
+      );
+      slot.strokeRoundedRect(cx - sensorW / 2, sensorY - 42, sensorW, 124, jackpot ? 22 : 16);
+
       this.add
-        .rectangle(cx, sensorY, b.w - 12, 98, fill, jackpot ? 0.88 : 0.82)
-        .setStrokeStyle(5, jackpot ? 0xffffff : DROP_COLORS.blueGate, 0.92)
-        .setDepth(7);
-      this.add
-        .rectangle(cx, sensorY - 34, b.w - 24, 12, 0xffffff, jackpot ? 0.34 : 0.16)
-        .setDepth(8);
-      this.add
-        .text(cx, sensorY, b.label, {
-          fontSize: jackpot ? '36px' : '28px',
-          color: '#ffffff',
+        .text(cx, sensorY + 8, b.label, {
+          fontSize: jackpot ? '42px' : safeEdge ? '24px' : '30px',
+          color: jackpot ? '#fff7bd' : '#ffffff',
           fontStyle: 'bold',
           stroke: jackpot ? '#5c3400' : '#06111f',
-          strokeThickness: 7,
+          strokeThickness: jackpot ? 8 : 6,
         })
         .setOrigin(0.5)
         .setDepth(9);
-      // Trennwand zwischen Bins (physisch), kanalisiert die Bälle.
+
+      if (safeEdge) this.addBoardLabel(cx, sensorY - 50, 'SAFE', '16px');
+      if (jackpot) this.addBoardLabel(cx, sensorY - 58, 'JACKPOT', '20px');
+
       if (i > 0) {
-        m.add.rectangle(b.x, binTop - 30, 6, 80, { isStatic: true, label: 'wall' });
-        this.add.rectangle(b.x, binTop - 30, 8, 86, 0xffffff, 0.62).setDepth(8);
+        const dividerX = b.x;
+        const leftNearJackpot = i === jackpotIndex || i - 1 === jackpotIndex;
+        const dividerH = leftNearJackpot ? 142 : 112;
+        this.addFunnelRail(
+          dividerX,
+          binTop + 16,
+          dividerH,
+          leftNearJackpot ? 16 : 12,
+          leftNearJackpot ? (dividerX < jackpotCenter ? -8 : 8) : 0,
+          leftNearJackpot ? DROP_COLORS.funnelMetal : DROP_COLORS.funnelWoodLight,
+          'wall',
+        );
       }
     });
+
+    const catcherPins = [
+      { x: jackpotCenter - 92, y: throatY, r: 13 },
+      { x: jackpotCenter + 92, y: throatY, r: 13 },
+      { x: jackpotCenter - 46, y: throatY + 38, r: 9 },
+      { x: jackpotCenter + 46, y: throatY + 38, r: 9 },
+    ];
+    catcherPins.forEach((pin) => {
+      m.add.circle(pin.x, pin.y, pin.r, {
+        isStatic: true,
+        restitution: this.board.defaultRestitution + 0.15,
+        label: 'catcher-pin',
+      });
+      this.add.circle(pin.x + 3, pin.y + 4, pin.r + 5, DROP_COLORS.pinShadow, 0.38).setDepth(8);
+      this.add.circle(pin.x, pin.y, pin.r + 3, DROP_COLORS.funnelMetal, 0.96).setDepth(9);
+      this.add.circle(pin.x - 3, pin.y - 3, Math.max(3, pin.r * 0.32), 0xffffff, 0.72).setDepth(10);
+    });
+
+    this.add.rectangle(CENTER_X, binBottom, GAME_WIDTH - 78, 10, 0xffffff, 0.18).setDepth(8);
+  }
+
+  private addFunnelRail(
+    x: number,
+    y: number,
+    length: number,
+    thickness: number,
+    angleDeg: number,
+    color: number,
+    label: string,
+  ): void {
+    const angle = Phaser.Math.DegToRad(angleDeg);
+    this.matter.add.rectangle(x, y, length, thickness, {
+      isStatic: true,
+      angle,
+      restitution: this.board.defaultRestitution * 0.9,
+      label,
+    });
+    this.add
+      .rectangle(x + 4, y + 6, length, thickness + 6, DROP_COLORS.pinShadow, 0.34)
+      .setRotation(angle)
+      .setDepth(6);
+    this.add
+      .rectangle(x, y, length, thickness, color, 0.94)
+      .setStrokeStyle(3, 0xffffff, 0.58)
+      .setRotation(angle)
+      .setDepth(8);
+    this.add
+      .rectangle(
+        x - Math.cos(angle) * length * 0.08,
+        y - Math.sin(angle) * length * 0.08,
+        length * 0.72,
+        Math.max(3, thickness * 0.22),
+        0xffffff,
+        0.22,
+      )
+      .setRotation(angle)
+      .setDepth(9);
   }
 
   private buildStageBackground(): void {
@@ -470,12 +593,9 @@ export class DropScene extends Phaser.Scene {
       },
     );
 
-    this.input.on(
-      'dragend',
-      (_p: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
-        if (obj === this.cup) this.settleCupTilt();
-      },
-    );
+    this.input.on('dragend', (_p: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
+      if (obj === this.cup) this.settleCupTilt();
+    });
 
     // Tap auf den Becher startet den Drop; ein vorheriger Drag zählt nur als Positionieren.
     this.cup.on('pointerup', () => {
@@ -820,7 +940,7 @@ export class DropScene extends Phaser.Scene {
     go.setData('resolved', true);
     const bin = this.board.bins[index];
     const contribution = this.resolver.collect(go.getData('value') as number, bin.multiplier);
-    this.floatingContribution(go.x, go.y, contribution, bin.multiplier >= 10);
+    this.floatingContribution(go.x, go.y, contribution, this.binResultKind(index));
     this.despawn(go);
     this.sumText.setText(`Σ ${this.resolver.total()}`);
     this.checkEnd();
@@ -832,24 +952,83 @@ export class DropScene extends Phaser.Scene {
     go.destroy();
   }
 
-  private floatingContribution(x: number, y: number, amount: number, jackpot: boolean): void {
+  private binResultKind(index: number): 'jackpot' | 'nearMiss' | 'normal' {
+    const jackpotIndex = this.board.bins.reduce(
+      (best, bin, i) => (bin.multiplier > this.board.bins[best].multiplier ? i : best),
+      0,
+    );
+    if (index === jackpotIndex) return 'jackpot';
+    if (Math.abs(index - jackpotIndex) === 1) return 'nearMiss';
+    return 'normal';
+  }
+
+  private floatingContribution(
+    x: number,
+    y: number,
+    amount: number,
+    result: 'jackpot' | 'nearMiss' | 'normal',
+  ): void {
+    const jackpot = result === 'jackpot';
+    const nearMiss = result === 'nearMiss';
+    const label = nearMiss ? `KNAPP! +${amount}` : `+${amount}`;
     const t = this.add
-      .text(x, y, `+${amount}`, {
-        fontSize: jackpot ? '34px' : '22px',
-        color: jackpot ? '#fff4a3' : '#ffffff',
+      .text(x, y, label, {
+        fontSize: jackpot ? '42px' : nearMiss ? '28px' : '22px',
+        color: jackpot ? '#fff4a3' : nearMiss ? '#ffd3a6' : '#ffffff',
         fontStyle: 'bold',
-        stroke: jackpot ? '#6b3f00' : '#0b1324',
-        strokeThickness: jackpot ? 7 : 5,
+        stroke: jackpot ? '#6b3f00' : nearMiss ? '#633000' : '#0b1324',
+        strokeThickness: jackpot ? 8 : nearMiss ? 6 : 5,
       })
       .setOrigin(0.5)
-      .setDepth(30);
+      .setDepth(34);
+
+    const burst = this.add
+      .circle(
+        x,
+        y,
+        jackpot ? 68 : nearMiss ? 42 : 26,
+        jackpot ? DROP_COLORS.jackpotGlow : DROP_COLORS.nearMiss,
+        jackpot ? 0.42 : nearMiss ? 0.28 : 0.16,
+      )
+      .setDepth(29);
+    this.tweens.add({
+      targets: burst,
+      scale: jackpot ? 2.2 : nearMiss ? 1.55 : 1.2,
+      alpha: 0,
+      duration: jackpot ? 520 : 360,
+      ease: 'Cubic.easeOut',
+      onComplete: () => burst.destroy(),
+    });
     this.tweens.add({
       targets: t,
-      y: y - 40,
+      y: y - (jackpot ? 82 : nearMiss ? 56 : 40),
+      scale: jackpot ? 1.22 : nearMiss ? 1.1 : 1,
       alpha: 0,
-      duration: 600,
+      duration: jackpot ? 860 : nearMiss ? 720 : 600,
+      ease: 'Cubic.easeOut',
       onComplete: () => t.destroy(),
     });
+
+    if (jackpot) {
+      this.cameras.main.flash(180, 255, 210, 90, false, undefined, 0.18);
+      this.cameras.main.shake(170, 0.006);
+      for (let i = 0; i < 22; i += 1) {
+        const sparkle = this.add
+          .circle(x, y, Phaser.Math.FloatBetween(2, 5), 0xfff4a3, 0.95)
+          .setDepth(33);
+        this.tweens.add({
+          targets: sparkle,
+          x: x + Phaser.Math.Between(-78, 78),
+          y: y + Phaser.Math.Between(-72, 38),
+          alpha: 0,
+          scale: 0.15,
+          duration: Phaser.Math.Between(320, 620),
+          onComplete: () => sparkle.destroy(),
+        });
+      }
+    } else if (nearMiss) {
+      this.cameras.main.shake(90, 0.0025);
+    }
   }
 
   // ---- Phasenende --------------------------------------------------------
