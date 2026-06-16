@@ -46,6 +46,7 @@ Deliverable. Lies in dieser Reihenfolge:
 | 11 | [Roadmap & MVP](docs/11-roadmap-and-mvp.md) | Vertical Slice, Milestones |
 | 12 | [Content-Bibliothek](docs/12-content-library.md) | Referenz-Seed: Gegner, Bosse, Sets, Blessings, Welten |
 | 13 | [KPIs & Analytics](docs/13-kpis-and-analytics.md) | Qualitäts-/Fairness-Ziele, lokale Analytics-Events (opt-in) |
+| 14 | [Projektstand & offene Punkte](docs/14-project-status.md) | **Aktueller Implementierungsstand, alle offenen Punkte/TODOs** |
 | — | [Decision Log](docs/decisions.md) | Verbindliche Designentscheidungen (ADR-001…014) |
 | — | [Glossar](docs/glossary.md) | Einheitliche Begriffe |
 
@@ -53,15 +54,15 @@ Deliverable. Lies in dieser Reihenfolge:
 
 ## Status
 
-🟢 **M5 – Meta-Progression.** Hauptmenü (`MetaScene`, DOM-Overlay) mit 6
-Ausrüstungs-Slots, Inventar, **Merge** (3→1 nächste Rarität), **Item-Leveling**
-(Gold/Baupläne) und permanenten **Meta-Fähigkeiten**. Items/Skills fließen als
-`scope:'meta'`-Modifier über `buildHeroStats` in den Helden (gelten ab Run-Start).
-Bosse droppen **garantiert ein Item** (ADR-007). Der `meta`-Scope wird in
-**IndexedDB** persistiert (Save-Versionierung). Routing: Menü → Run → Tod/Sieg → Menü.
+🟢 **M1–M5 fertig · M6 in Arbeit.** Spielbarer Vertical Slice **mit Meta-Progression
+und Content-Breite**: Hauptmenü → Kampf (rundenbasiertes Auto-Battle) → Drop
+(Matter.js-Pachinko) → Shop (DOM, Upgrades wirken) → Level-Progression über **2
+Welten** mit Boss-Loot → Run-Ende → Menü. 80 Tests grün.
 
-Davor: **M4** Shop (DOM, gewichteter Pool, Upgrades wirken), **M3** Matter.js-Drop,
-**M2** Auto-Battle, **M1** leerer Loop. Siehe [Roadmap](docs/11-roadmap-and-mvp.md).
+**M6 offen:** Active Ability Deck, Audio/Haptik, Settings-UI, Lokalisierung,
+Performance-/PWA-Pass. **Vollständiger Stand & alle offenen Punkte:**
+[docs/14 – Projektstand](docs/14-project-status.md). Roadmap:
+[docs/11](docs/11-roadmap-and-mvp.md).
 
 ---
 
