@@ -21,7 +21,12 @@ type MatterBody = MatterJS.BodyType & { gameObject?: Phaser.GameObjects.Arc | nu
 
 const BALL_RADIUS = 8;
 const DRIP_INTERVAL_MS = 60;
-const SPIN_TIMEOUT_MS = 12000; // Timeout-Sicherung: Phase endet garantiert
+// Settling-Frist NACH dem Ausschütten aller Bälle (nicht ab release — sonst
+// frisst die Spawn-Dauer von ammo × DRIP die Frist auf und große Drops würden
+// mitten im Spawnen abgeschnitten). Zusätzlich ein großzügiger Backstop, der
+// die Spawn-Dauer einrechnet.
+const SETTLE_GRACE_MS = 4000;
+const TIMEOUT_SLACK_MS = 6000;
 const CUP_Y = 180;
 const BOUNCE_COOLDOWN_MS = 280; // verhindert Mehrfach-Trigger beim Überlappen
 const MAX_BOUNCES = 3; // pro Ball — danach fällt er durch (Phase terminiert sicher)
@@ -240,15 +245,23 @@ export class DropScene extends Phaser.Scene {
       loop: true,
       callback: () => this.dripOne(),
     });
-    // Globale Timeout-Sicherung.
-    this.time.delayedCall(SPIN_TIMEOUT_MS, () => this.forceEnd());
+    // Absoluter Backstop: Spawn-Dauer (ammo × DRIP) + Settling + Reserve.
+    // Greift nur, falls allSpawned wider Erwarten nie eintritt — die reguläre
+    // Frist startet erst NACH dem letzten Spawn (siehe dripOne/allSpawned).
+    const backstop = this.ammo * DRIP_INTERVAL_MS + SETTLE_GRACE_MS + TIMEOUT_SLACK_MS;
+    this.time.delayedCall(backstop, () => this.forceEnd());
   }
 
   private dripOne(): void {
     if (this.finished) return;
     if (this.active.size >= this.board.maxConcurrentBalls) return; // Performance-Cap
     if (this.spawned >= this.ammo) {
-      this.allSpawned = true;
+      if (!this.allSpawned) {
+        this.allSpawned = true;
+        this.dripTimer?.remove();
+        // Erst ab hier läuft die Settling-Frist — der Spawn ist abgeschlossen.
+        this.time.delayedCall(SETTLE_GRACE_MS, () => this.forceEnd());
+      }
       return;
     }
     this.spawned += 1;
@@ -428,8 +441,10 @@ export class DropScene extends Phaser.Scene {
 
   private forceEnd(): void {
     if (this.finished) return;
+    // Noch aktive Bälle mit ihrem getragenen Wert gutschreiben (nicht 0) —
+    // sonst ginge bei großen Drops legitimer Ertrag verloren.
     for (const go of [...this.active]) {
-      this.resolver.collectLost(0);
+      this.resolver.collectLost(go.getData('value') as number);
       this.despawn(go);
     }
     this.finish();
