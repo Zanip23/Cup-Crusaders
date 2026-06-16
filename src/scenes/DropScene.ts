@@ -689,6 +689,12 @@ export class DropScene extends Phaser.Scene {
 
   private despawn(go: Phaser.GameObjects.Arc): void {
     this.active.delete(go);
+    // WICHTIG: Laufende Tweens (z. B. der Scale-„Pop" aus flashBallValue) zuerst
+    // stoppen. Bälle sind Matter-Bodies — ein Scale-Tween skaliert pro Frame auch
+    // den Physik-Body. Wird der Body hier entfernt, während der Tween noch läuft,
+    // greift Phasers Matter-Transform im nächsten Frame auf den fehlenden Body zu
+    // (Body.scale → body.position) und die Render-Loop stirbt (weißer/leerer Canvas).
+    this.tweens.killTweensOf(go);
     if (go.body) this.matter.world.remove(go.body as MatterJS.BodyType);
     go.destroy();
   }
