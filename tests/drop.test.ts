@@ -39,11 +39,12 @@ describe('DropResolver — Value-Carrying & Summation (ADR-009)', () => {
   });
 });
 
-describe('BOARD_BASIC — Near-Miss-Layout', () => {
-  it('hat zentralen x10-Bin und je 2 Tore/Pegs', () => {
-    expect(BOARD_BASIC.bins.map((b) => b.multiplier)).toEqual([1, 5, 10, 5, 1]);
-    expect(BOARD_BASIC.bins[2].multiplier).toBe(10); // zentral
-    expect(BOARD_BASIC.gates).toHaveLength(2);
-    expect(BOARD_BASIC.pegs.length).toBeGreaterThan(20);
+describe('BOARD_BASIC — Catcher-Layout (Fill-the-Cup)', () => {
+  it('hat horizontale Multiplikator-Balken und eine Catcher-Breite', () => {
+    const bars = BOARD_BASIC.platforms ?? [];
+    expect(bars.length).toBeGreaterThan(0);
+    // Alle Balken vervielfachen die Ball-ANZAHL (gateMultiply).
+    expect(bars.every((p) => p.effect.type === 'gateMultiply')).toBe(true);
+    expect(BOARD_BASIC.catcherWidth).toBeGreaterThan(0);
   });
 });

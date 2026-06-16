@@ -15,21 +15,14 @@ import type { BoardDef } from '@/types/content';
 import {
   DROP_COLORS,
   gateColor,
-  renderBinSlot,
   renderBoardLabel,
+  renderCatcher,
   renderCup,
-  renderFunnelRail,
   renderGate,
   renderPeg,
   renderStageBackground,
 } from '@/scenes/drop/DropBoardRenderer';
-import {
-  floatingContribution,
-  playGateFx,
-  playJackpotFx,
-  playStreamParticle,
-  type BinFxKind,
-} from '@/scenes/drop/DropFx';
+import { floatingContribution, playGateFx, playStreamParticle } from '@/scenes/drop/DropFx';
 
 // Drop-Phase mit echter Matter.js-Physik (ADR-009, docs/05). Physik-autoritativ:
 // Bälle sind Value-Carrying Bodies; Tore/Bins sind Sensoren; der DropResolver
@@ -41,13 +34,19 @@ const DRIP_INTERVAL_MS = 34;
 const MAX_BONUS_BALLS_PER_GATE = 4;
 const STRONG_GATE_THRESHOLD = 3;
 const SPIN_TIMEOUT_MS = 18000; // Timeout-Sicherung: Phase endet garantiert
-const CUP_Y = 180;
+const CUP_Y = 180; // beweglicher Ausschütt-Becher (oben)
+const CATCHER_Y = GAME_HEIGHT - 150; // fester Fang-Becher (unten)
+const LOST_Y = GAME_HEIGHT - 64; // unterhalb des Catchers verfehlt → Ball verloren
+const DEFAULT_CATCHER_W = 160; // Fang-Mund-Breite, falls Board nichts vorgibt
 
 export class DropScene extends Phaser.Scene {
   private board!: BoardDef;
   private resolver!: DropResolver;
   private cup!: Phaser.GameObjects.Container;
   private cupAmmoText!: Phaser.GameObjects.Text;
+  private catcher!: Phaser.GameObjects.Container;
+  private catcherCountText!: Phaser.GameObjects.Text;
+  private catcherWidth = DEFAULT_CATCHER_W;
   private sumText!: Phaser.GameObjects.Text;
   private ammo = 0;
   private spawned = 0;
@@ -84,13 +83,14 @@ export class DropScene extends Phaser.Scene {
     this.ammo = selectBallsFromCombat(gsm.getState()) + Math.round(startingBalls);
     this.resolver = new DropResolver();
 
-    new TopBar(this, 'DROP (Pachinko)', () => `🏐 ${this.ammo}`);
+    new TopBar(this, 'DROP · Becher füllen', () => `🏐 ${this.ammo}`);
 
     this.sumText = this.add
       .text(CENTER_X, 130, 'Σ 0', { fontSize: '26px', color: '#f4c430', fontStyle: 'bold' })
       .setOrigin(0.5);
 
     this.buildBoard();
+    this.buildCatcher();
     this.buildCup();
     this.buildControls();
     this.setupKeyboard();
@@ -122,13 +122,13 @@ export class DropScene extends Phaser.Scene {
     const m = this.matter;
     renderStageBackground(this);
 
-    // Wände + Floor (statisch, nicht-Sensor).
+    // Seitenwände (statisch). KEIN Boden — verfehlte Bälle fallen unten heraus
+    // und werden vom sweep() als „verloren" verbucht, damit die Phase endet.
     m.add.rectangle(-10, GAME_HEIGHT / 2, 20, GAME_HEIGHT, { isStatic: true, label: 'wall' });
     m.add.rectangle(GAME_WIDTH + 10, GAME_HEIGHT / 2, 20, GAME_HEIGHT, {
       isStatic: true,
       label: 'wall',
     });
-    m.add.rectangle(CENTER_X, GAME_HEIGHT - 30, GAME_WIDTH, 20, { isStatic: true, label: 'wall' });
 
     // Pegs als glänzende Pins.
     for (const peg of this.board.pegs) {
@@ -248,119 +248,26 @@ export class DropScene extends Phaser.Scene {
       renderGate(this, g);
     });
 
-    // Funnel-Catcher: sichtbare Rampen, Pins und Sensoren bilden dieselbe Geometrie ab.
-    const binTop = GAME_HEIGHT - 360;
-    const throatY = binTop - 26;
-    const sensorY = binTop + 58;
-    const binBottom = GAME_HEIGHT - 92;
-    const binCenters = this.board.bins.map((b) => b.x + b.w / 2);
-    const jackpotIndex = this.board.bins.reduce(
-      (best, bin, i) => (bin.multiplier > this.board.bins[best].multiplier ? i : best),
-      0,
-    );
-    const jackpotCenter = binCenters[jackpotIndex] ?? CENTER_X;
-
-    const funnelBack = this.add.graphics().setDepth(5);
-    funnelBack.fillStyle(0x06111f, 0.78);
-    funnelBack.fillRoundedRect(18, binTop - 96, GAME_WIDTH - 36, 212, 24);
-    funnelBack.lineStyle(4, 0xd7f3ff, 0.25);
-    funnelBack.strokeRoundedRect(18, binTop - 96, GAME_WIDTH - 36, 212, 24);
-
-    this.addFunnelRail(66, binTop - 110, 210, 24, -24, DROP_COLORS.funnelWoodLight, 'wall');
-    this.addFunnelRail(
-      GAME_WIDTH - 66,
-      binTop - 110,
-      210,
-      24,
-      24,
-      DROP_COLORS.funnelWoodLight,
-      'wall',
-    );
-    this.addFunnelRail(142, binTop - 18, 178, 20, -14, DROP_COLORS.funnelWood, 'wall');
-    this.addFunnelRail(GAME_WIDTH - 142, binTop - 18, 178, 20, 14, DROP_COLORS.funnelWood, 'wall');
-
-    const jackpotGlow = this.add
-      .circle(jackpotCenter, sensorY, 92, DROP_COLORS.jackpotGlow, 0.2)
-      .setDepth(6);
-    this.tweens.add({
-      targets: jackpotGlow,
-      scale: { from: 0.9, to: 1.18 },
-      alpha: { from: 0.16, to: 0.34 },
-      duration: 1050,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-
-    this.board.bins.forEach((b, i) => {
-      const cx = b.x + b.w / 2;
-      const jackpot = i === jackpotIndex;
-      const safeEdge = i === 0 || i === this.board.bins.length - 1;
-      const sensorW = b.w - (jackpot ? 2 : 10);
-      m.add.rectangle(cx, sensorY, sensorW, 92, {
-        isStatic: true,
-        isSensor: true,
-        label: `bin:${i}`,
-      });
-
-      renderBinSlot(this, cx, sensorY, sensorW, b.label, jackpot, safeEdge);
-
-      if (safeEdge) renderBoardLabel(this, cx, sensorY - 50, 'SAFE', '16px');
-      if (jackpot) renderBoardLabel(this, cx, sensorY - 58, 'JACKPOT', '20px');
-
-      if (i > 0) {
-        const dividerX = b.x;
-        const leftNearJackpot = i === jackpotIndex || i - 1 === jackpotIndex;
-        const dividerH = leftNearJackpot ? 142 : 112;
-        this.addFunnelRail(
-          dividerX,
-          binTop + 16,
-          dividerH,
-          leftNearJackpot ? 16 : 12,
-          leftNearJackpot ? (dividerX < jackpotCenter ? -8 : 8) : 0,
-          leftNearJackpot ? DROP_COLORS.funnelMetal : DROP_COLORS.funnelWoodLight,
-          'wall',
-        );
-      }
-    });
-
-    const catcherPins = [
-      { x: jackpotCenter - 92, y: throatY, r: 13 },
-      { x: jackpotCenter + 92, y: throatY, r: 13 },
-      { x: jackpotCenter - 46, y: throatY + 38, r: 9 },
-      { x: jackpotCenter + 46, y: throatY + 38, r: 9 },
-    ];
-    catcherPins.forEach((pin) => {
-      m.add.circle(pin.x, pin.y, pin.r, {
-        isStatic: true,
-        restitution: this.board.defaultRestitution + 0.15,
-        label: 'catcher-pin',
-      });
-      this.add.circle(pin.x + 3, pin.y + 4, pin.r + 5, DROP_COLORS.pinShadow, 0.38).setDepth(8);
-      this.add.circle(pin.x, pin.y, pin.r + 3, DROP_COLORS.funnelMetal, 0.96).setDepth(9);
-      this.add.circle(pin.x - 3, pin.y - 3, Math.max(3, pin.r * 0.32), 0xffffff, 0.72).setDepth(10);
-    });
-
-    this.add.rectangle(CENTER_X, binBottom, GAME_WIDTH - 78, 10, 0xffffff, 0.18).setDepth(8);
+    // „Lost"-Linie: dezenter Hinweis, wo verfehlte Bälle unten herausfallen.
+    this.add.rectangle(CENTER_X, LOST_Y + 18, GAME_WIDTH, 2, 0xffffff, 0.07).setDepth(2);
   }
 
-  private addFunnelRail(
-    x: number,
-    y: number,
-    length: number,
-    thickness: number,
-    angleDeg: number,
-    color: number,
-    label: string,
-  ): void {
-    const angle = Phaser.Math.DegToRad(angleDeg);
-    this.matter.add.rectangle(x, y, length, thickness, {
+  // Fester Fang-Becher unten: ein Sensor-Mund fängt Bälle auf (Treffer = +Wert).
+  private buildCatcher(): void {
+    this.catcherWidth = this.board.catcherWidth ?? DEFAULT_CATCHER_W;
+
+    const catcherVisuals = renderCatcher(this, CENTER_X, CATCHER_Y, this.catcherWidth);
+    this.catcher = catcherVisuals.cup;
+    this.catcherCountText = catcherVisuals.ammoText;
+    this.catcherCountText.setText('0');
+
+    // Hoher Sensor über die volle Öffnungsbreite = Becher-Volumen. Höhe statt nur
+    // Mund-Linie verhindert, dass schnelle Bälle in einem Physik-Step „durchtunneln".
+    this.matter.add.rectangle(CENTER_X, CATCHER_Y, this.catcherWidth, 96, {
       isStatic: true,
-      angle,
-      restitution: this.board.defaultRestitution * 0.9,
-      label,
+      isSensor: true,
+      label: 'catcher',
     });
-    renderFunnelRail(this, x, y, length, thickness, angleDeg, color);
   }
 
   private buildCup(): void {
@@ -579,7 +486,7 @@ export class DropScene extends Phaser.Scene {
           );
         else if (other.startsWith('booster:'))
           this.handleBooster(go, ballBody, Number(other.slice(8)));
-        else if (other.startsWith('bin:')) this.handleBin(go, Number(other.slice(4)));
+        else if (other === 'catcher') this.handleCatch(go);
       }
     };
     this.matter.world.on('collisionstart', this.collisionHandler);
@@ -671,20 +578,33 @@ export class DropScene extends Phaser.Scene {
     this.tweens.add({ targets: go, alpha: 0.45, duration: 60, yoyo: true });
   }
 
-  private handleBin(go: Phaser.GameObjects.Arc, index: number): void {
+  // Ball im Fang-Becher gelandet: Wert verbuchen (Catcher-Multiplikator = 1).
+  private handleCatch(go: Phaser.GameObjects.Arc): void {
     if (go.getData('resolved')) return;
     go.setData('resolved', true);
-    const bin = this.board.bins[index];
-    const contribution = this.resolver.collect(go.getData('value') as number, bin.multiplier);
-    const result = this.binResultKind(index, contribution);
-    this.playBinFx(go.x, go.y, contribution, result);
-    if (result === 'jackpot') {
-      this.playOptionalSound('drop-jackpot');
-      playJackpotFx(this, go.x, go.y);
-    }
+    const value = go.getData('value') as number;
+    const contribution = this.resolver.collect(value, 1);
+    floatingContribution(this, go.x, go.y, contribution, contribution >= 5 ? 'good' : 'normal');
+    this.playOptionalSound('drop-catch');
+    this.bumpCatcher();
     this.despawn(go);
-    this.sumText.setText(`Σ ${this.resolver.total()}`);
+    const total = this.resolver.total();
+    this.catcherCountText.setText(`${total}`);
+    this.sumText.setText(`Σ ${total}`);
     this.checkEnd();
+  }
+
+  // Kleiner „Auffang"-Impuls auf den Catcher als Feedback.
+  private bumpCatcher(): void {
+    this.tweens.killTweensOf(this.catcher);
+    this.tweens.add({
+      targets: this.catcher,
+      scaleX: 1.08,
+      scaleY: 0.92,
+      duration: 70,
+      yoyo: true,
+      ease: 'Sine.easeOut',
+    });
   }
 
   private despawn(go: Phaser.GameObjects.Arc): void {
@@ -699,27 +619,6 @@ export class DropScene extends Phaser.Scene {
     go.destroy();
   }
 
-  private binResultKind(index: number, contribution: number): BinFxKind {
-    const bin = this.board.bins[index];
-    const jackpotIndexes = this.board.bins
-      .map((candidate, candidateIndex) => (candidate.multiplier >= 10 ? candidateIndex : -1))
-      .filter((candidateIndex) => candidateIndex >= 0);
-    const nearJackpot = jackpotIndexes.some((jackpotIndex) => Math.abs(index - jackpotIndex) === 1);
-    if (bin.multiplier >= 10) return 'jackpot';
-    if (nearJackpot) return 'nearMiss';
-    if (bin.multiplier >= 3 || contribution >= 5) return 'good';
-    return 'normal';
-  }
-
-  private playBinFx(x: number, y: number, amount: number, result: BinFxKind): void {
-    floatingContribution(this, x, y, amount, result);
-    if (result === 'good') this.cameras.main.shake(80, 0.002);
-    if (result === 'nearMiss') {
-      this.playOptionalSound('drop-near-miss');
-      this.cameras.main.shake(120, 0.0035);
-    }
-  }
-
   private playOptionalSound(key: string): void {
     if (this.cache.audio.exists(key)) this.sound.play(key);
   }
@@ -728,9 +627,10 @@ export class DropScene extends Phaser.Scene {
 
   private sweep(): void {
     if (this.finished) return;
-    // Off-Screen / feststeckende Bälle einsammeln (Mindestwert), damit die Phase endet.
+    // Bälle, die den Catcher verfehlt haben (unter der Lost-Linie), als verloren
+    // verbuchen und entfernen, damit die Phase garantiert endet.
     for (const go of [...this.active]) {
-      if (go.y > GAME_HEIGHT + 40) {
+      if (go.y > LOST_Y) {
         this.resolver.collectLost(0);
         this.despawn(go);
       }
