@@ -5,7 +5,7 @@ import { test, expect, type Page } from '@playwright/test';
 // werden über den read-only Debug-Hook window.__cc abgewartet, nicht geklickt.
 
 const H = 1280;
-const DROP_RELEASE = { x: 360, y: H - 180 };
+const DROP_RELEASE = { x: 360, y: H - 90 }; // „Ausschütten"-Button
 const SHOP_CARD = { x: 360, y: Math.round(H * 0.45) };
 const SHOP_NEXT = { x: 360, y: H - 150 };
 

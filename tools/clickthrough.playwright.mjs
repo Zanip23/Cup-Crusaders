@@ -104,7 +104,7 @@ async function main() {
       });
     };
 
-    const DROP_RELEASE = [360, H - 180];
+    const DROP_RELEASE = [360, H - 90]; // „Ausschütten"-Button
     const SHOP_CARD = [360, Math.round(H * 0.45)];
     const SHOP_NEXT = [360, H - 150];
 

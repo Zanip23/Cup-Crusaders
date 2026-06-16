@@ -81,3 +81,40 @@ export interface ScalingProfile {
 
 /** Laufzeit-Modifier, der aus einem addModifier-Effect erzeugt wird. */
 export type RuntimeModifier = Omit<Modifier, 'scope'> & { scope?: Modifier['scope'] };
+
+// ---- Pachinko-Board (docs/08 §3.6, docs/05) ------------------------------
+
+export interface PegDef {
+  x: number;
+  y: number;
+  radius: number;
+}
+
+export interface GateDef {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  effect: Effect; // gateMultiply | gateAdd
+  label: string;
+}
+
+export interface BinDef {
+  x: number; // linke Kante
+  w: number;
+  multiplier: number;
+  label: string;
+  special?: Effect;
+}
+
+export interface BoardDef {
+  id: string;
+  width: number;
+  height: number;
+  gravity: number;
+  defaultRestitution: number; // Bounce
+  pegs: PegDef[];
+  gates: GateDef[];
+  bins: BinDef[];
+  maxConcurrentBalls: number; // Performance-Cap (docs/05)
+}

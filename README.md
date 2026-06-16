@@ -53,15 +53,16 @@ Deliverable. Lies in dieser Reihenfolge:
 
 ## Status
 
-🟢 **M2 – Kampf-Phase (Vertical Slice).** Auf dem leeren M1-Loop steht jetzt echtes,
-rundenbasiertes Auto-Battle (ADR-005): `StatEngine` (inkl. Caps), `EffectSystem`
-(addModifier/onHit/onKill), `CombatSystem` (testbar), `WaveSpawner` mit Skalierung,
-Held „Fletcher" + Gegner + Boss, 15-Wellen-Default, HP-Balken, Hit-Flash, Floating
-Combat Text und Ball-Drops (Tod + Treffer-Chance) mit Tween in die Cup-UI →
-`transfer.ballsFromCombat`. Drop/Shop bleiben vorerst Platzhalter (M3/M4).
+🟢 **M3 – Drop-Phase (Vertical Slice).** Echte **Matter.js-Pachinko-Physik**
+(ADR-009, physik-autoritativ): Becher (Drag **+** Tap/Buttons als WCAG-Alternative),
+gestaffeltes Peg-Feld, Tore (x2 / +5) und Bins (x1/x5/x10/x5/x1) mit zentralem
+Near-Miss-x10. Bälle sind **Value-Carrying Bodies**; der `DropResolver` summiert nur
+die tatsächlichen Ergebnisse → `transfer.ballsFromDrop` → Shop-Währung. Mit
+Performance-Cap, gestreutem Tropfen und Timeout-Sicherung.
 
-Davor: **M1** — Vite + TS + Phaser-3-Setup, der „leere" 3-Phasen-Loop und der
-`transfer`-Kanal (Kampf → Drop → Shop). Siehe [Roadmap](docs/11-roadmap-and-mvp.md).
+Davor: **M2** rundenbasiertes Auto-Battle (StatEngine/EffectSystem/CombatSystem,
+Held/Gegner/Boss, Ball-Drops) und **M1** (leerer Loop + `transfer`-Kanal). Shop ist
+noch Platzhalter (M4). Siehe [Roadmap](docs/11-roadmap-and-mvp.md).
 
 ---
 
