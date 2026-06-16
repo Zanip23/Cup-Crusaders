@@ -104,6 +104,12 @@ describe('Skalierung & WaveSpawner', () => {
     expect(s.hp).toBe(BRIGAND_LORD.baseStats.hp * 10);
   });
 
+  it('Boss erhält KEINE zusätzliche Wellen-Skalierung (Set-Piece)', () => {
+    // Welle 15 darf den Boss NICHT zusätzlich ×1.98 aufblähen.
+    const w15 = scaleEnemy(BRIGAND_LORD, 15, 1, DEFAULT_SCALING);
+    expect(w15.hp).toBe(BRIGAND_LORD.baseStats.hp * 10); // == Welle 1
+  });
+
   it('Wellen-Skalierung erhöht HP linear (+7 %/Welle)', () => {
     const w1 = scaleEnemy(MUG_GREMLIN, 1, 1).hp;
     const w11 = scaleEnemy(MUG_GREMLIN, 11, 1).hp;

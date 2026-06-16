@@ -35,6 +35,8 @@ export class DropScene extends Phaser.Scene {
   private allSpawned = false;
   private finished = false;
   private readonly active = new Set<Phaser.GameObjects.Arc>();
+  private dripTimer?: Phaser.Time.TimerEvent;
+  private collisionHandler?: (e: Phaser.Physics.Matter.Events.CollisionStartEvent) => void;
 
   constructor() {
     // Matter nur in dieser Szene aktiv (docs/01) — per-Scene-Physics-Config.
@@ -67,6 +69,14 @@ export class DropScene extends Phaser.Scene {
 
     // Periodischer End-Check + Off-Screen-Despawn.
     this.time.addEvent({ delay: 400, loop: true, callback: () => this.sweep() });
+
+    // Matter-World-Handler bei Szenen-Shutdown abmelden. Die per-Scene-Matter-World
+    // wird beim Shutdown ohnehin verworfen (this.matter.world ist dann ggf. null) →
+    // null-sicher zugreifen.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.collisionHandler) this.matter?.world?.off('collisionstart', this.collisionHandler);
+      this.dripTimer?.remove();
+    });
   }
 
   private resetState(): void {
@@ -164,7 +174,11 @@ export class DropScene extends Phaser.Scene {
       return;
     }
     this.releasing = true;
-    this.time.addEvent({ delay: DRIP_INTERVAL_MS, loop: true, callback: () => this.dripOne() });
+    this.dripTimer = this.time.addEvent({
+      delay: DRIP_INTERVAL_MS,
+      loop: true,
+      callback: () => this.dripOne(),
+    });
     // Globale Timeout-Sicherung.
     this.time.delayedCall(SPIN_TIMEOUT_MS, () => this.forceEnd());
   }
@@ -195,7 +209,7 @@ export class DropScene extends Phaser.Scene {
   }
 
   private registerCollisions(): void {
-    this.matter.world.on('collisionstart', (event: Phaser.Physics.Matter.Events.CollisionStartEvent) => {
+    this.collisionHandler = (event: Phaser.Physics.Matter.Events.CollisionStartEvent) => {
       for (const pair of event.pairs) {
         const a = pair.bodyA as MatterBody;
         const b = pair.bodyB as MatterBody;
@@ -214,7 +228,8 @@ export class DropScene extends Phaser.Scene {
         if (other.startsWith('gate:')) this.handleGate(go, Number(other.slice(5)));
         else if (other.startsWith('bin:')) this.handleBin(go, Number(other.slice(4)));
       }
-    });
+    };
+    this.matter.world.on('collisionstart', this.collisionHandler);
   }
 
   private handleGate(go: Phaser.GameObjects.Arc, index: number): void {
@@ -287,6 +302,7 @@ export class DropScene extends Phaser.Scene {
   private finish(): void {
     if (this.finished) return;
     this.finished = true;
+    this.dripTimer?.remove();
     const balls = this.resolver.total();
     this.sumText.setText(`Σ ${balls}`);
     this.time.delayedCall(500, () => eventBus.emit(GameEvent.DropComplete, { balls }));

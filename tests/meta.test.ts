@@ -129,4 +129,12 @@ describe('Meta-Reducer', () => {
     expect(s.run.phase).toBe('menu');
     expect(s.meta.currencies.gold).toBeGreaterThan(0);
   });
+
+  it('END_RUN klammert highestLevel auf totalWaves (kein „Welle 16 von 15")', () => {
+    let s = createInitialState();
+    // Zustand nach Boss-Shop: waveNumber bereits über die Bosswelle inkrementiert.
+    s = { ...s, run: { ...s.run, waveNumber: 16, totalWaves: 15 } };
+    s = reducer(s, { type: 'END_RUN', victory: true });
+    expect(s.meta.highestLevel).toBe(15);
+  });
 });

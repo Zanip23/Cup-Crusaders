@@ -39,6 +39,7 @@ export class CombatScene extends Phaser.Scene {
   private heroMaxHp = 1;
   private readonly enemyViews = new Map<string, EnemyView>();
   private finished = false;
+  private reducedMotion = false;
 
   constructor() {
     super('Combat');
@@ -48,6 +49,7 @@ export class CombatScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(COLORS.combat);
     this.finished = false;
     this.enemyViews.clear();
+    this.reducedMotion = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
     const gsm = getGsm(this);
     const waveNumber = gsm.getState().run.waveNumber;
@@ -220,7 +222,7 @@ export class CombatScene extends Phaser.Scene {
         }
         this.heroRect.setFillStyle(0xffffff);
         this.time.delayedCall(80, () => this.heroRect.setFillStyle(COLORS.hero));
-        this.cameras.main.shake(120, 0.006);
+        if (!this.reducedMotion) this.cameras.main.shake(120, 0.006);
         this.floatingText(HERO_X, STAGE_Y - 40, `-${atk.dealt}`, '#e74c3c', 22);
       });
     });

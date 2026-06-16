@@ -161,7 +161,10 @@ export function reducer(state: GameState, action: Action): GameState {
 
     case 'END_RUN': {
       const gold = action.victory ? runRewardGold(state.run.totalWaves, true) : 0;
-      const highestLevel = Math.max(state.meta.highestLevel, state.run.waveNumber);
+      // waveNumber wurde durch SHOP_COMPLETE bereits über die Bosswelle erhöht →
+      // auf totalWaves klammern (sonst „Welle 16 von 15").
+      const reached = Math.min(state.run.waveNumber, state.run.totalWaves || state.run.waveNumber);
+      const highestLevel = Math.max(state.meta.highestLevel, reached);
       return {
         ...state,
         run: createMenuRun(),

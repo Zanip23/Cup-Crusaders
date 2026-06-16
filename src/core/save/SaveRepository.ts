@@ -19,6 +19,17 @@ const KEY = 'state';
  * Migrationspipeline (docs/09). Hebt einen geladenen Blob auf SAVE_VERSION.
  * Da nur IDs/Instances gespeichert werden, sind Migrationen selten nötig.
  */
+/** Minimaler Struktur-Guard: schützt vor korrupten/versionslosen Blobs (docs/09). */
+function isValidSavedShape(raw: unknown): raw is SavedState {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const s = raw as Record<string, unknown>;
+  if (typeof s.version !== 'number') return false;
+  const meta = s.meta as Record<string, unknown> | undefined;
+  if (!meta || typeof meta.currencies !== 'object' || !Array.isArray(meta.inventory)) return false;
+  if (typeof s.settings !== 'object' || s.settings === null) return false;
+  return true;
+}
+
 function migrate(raw: SavedState): SavedState {
   let s = raw;
   // Beispiel-Gerüst: while (s.version < SAVE_VERSION) { ...; s.version++; }
@@ -50,13 +61,17 @@ export class IndexedDbSaveRepository implements SaveRepository {
   async load(): Promise<SavedState | null> {
     try {
       const db = await this.open();
-      const raw = await new Promise<SavedState | undefined>((resolve, reject) => {
+      const raw = await new Promise<unknown>((resolve, reject) => {
         const tx = db.transaction(STORE, 'readonly');
         const req = tx.objectStore(STORE).get(KEY);
-        req.onsuccess = () => resolve(req.result as SavedState | undefined);
+        req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
       });
       if (!raw) return null;
+      if (!isValidSavedShape(raw)) {
+        console.warn('[SaveRepository] Save strukturell ungültig — starte frisch.');
+        return null;
+      }
       return migrate(raw);
     } catch (err) {
       // Korrupter/inkompatibler Save → niemals crashen (docs/09).

@@ -33,8 +33,11 @@ export function scaleEnemy(
 ): ScaledStats {
   const hpChapter = Math.pow(profile.hpPerChapter, chapter - 1);
   const dmgChapter = Math.pow(profile.dmgPerChapter, chapter - 1);
-  const hpWave = 1 + profile.hpPerWave * (wave - 1);
-  const dmgWave = 1 + profile.dmgPerWave * (wave - 1);
+  // Bosse sind Set-Piece-Encounter: nur Kapitel- + Rollen-Mult, KEINE Wellen-
+  // Skalierung obendrauf (sonst stapelt sich ×Welle auf ×10 → unfair tanky).
+  const isBoss = def.role === 'boss';
+  const hpWave = isBoss ? 1 : 1 + profile.hpPerWave * (wave - 1);
+  const dmgWave = isBoss ? 1 : 1 + profile.dmgPerWave * (wave - 1);
 
   let hpRole = 1;
   let dmgRole = 1;
