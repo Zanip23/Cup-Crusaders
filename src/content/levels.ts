@@ -50,7 +50,7 @@ function boardOptionsForWave(
 
   if (wave?.isBoss) {
     return {
-      allowedTemplates: ['risk_wall', 'split_choice', 'bonus_trap'],
+      allowedTemplates: ['dense_multiplier_wall', 'bonus_lane', 'booster_lane'],
       allowMystery: true,
       allowBoosters: true,
       budgetBonus: 26,
@@ -61,7 +61,7 @@ function boardOptionsForWave(
 
   if (progress < 0.34) {
     return {
-      allowedTemplates: ['classic', 'rain'],
+      allowedTemplates: ['bar_cascade', 'side_switch'],
       allowMystery: false,
       allowBoosters: false,
       budgetBonus: -10,
@@ -72,7 +72,7 @@ function boardOptionsForWave(
 
   if (progress < 0.67) {
     return {
-      allowedTemplates: ['classic', 'snake', 'booster_tunnel', 'rain'],
+      allowedTemplates: ['bar_cascade', 'side_switch', 'bonus_lane', 'booster_lane'],
       allowMystery: true,
       allowBoosters: true,
       budgetBonus: 4,
@@ -82,7 +82,7 @@ function boardOptionsForWave(
   }
 
   return {
-    allowedTemplates: ['snake', 'split_choice', 'booster_tunnel', 'bonus_trap', 'risk_wall'],
+    allowedTemplates: ['side_switch', 'dense_multiplier_wall', 'bonus_lane', 'booster_lane'],
     allowMystery: true,
     allowBoosters: true,
     budgetBonus: 14,
