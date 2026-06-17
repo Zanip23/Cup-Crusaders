@@ -64,28 +64,28 @@ function boardOptionsForWave(
       allowedTemplates: ['bar_cascade', 'side_switch'],
       allowMystery: false,
       allowBoosters: false,
-      budgetBonus: -10,
-      difficultyBonus: -1,
+      budgetBonus: -14,
+      difficultyBonus: -2,
       idSuffix: 'early',
     };
   }
 
   if (progress < 0.67) {
     return {
-      allowedTemplates: ['bar_cascade', 'side_switch', 'bonus_lane', 'booster_lane'],
+      allowedTemplates: ['bar_cascade', 'bonus_lane', 'booster_lane'],
       allowMystery: true,
       allowBoosters: true,
-      budgetBonus: 4,
+      budgetBonus: 6,
       difficultyBonus: 1,
       idSuffix: 'mid',
     };
   }
 
   return {
-    allowedTemplates: ['side_switch', 'dense_multiplier_wall', 'bonus_lane', 'booster_lane'],
+    allowedTemplates: ['dense_multiplier_wall', 'bonus_lane', 'booster_lane'],
     allowMystery: true,
     allowBoosters: true,
-    budgetBonus: 14,
+    budgetBonus: 18,
     difficultyBonus: 2,
     idSuffix: 'late',
   };
