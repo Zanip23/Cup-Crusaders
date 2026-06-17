@@ -28,7 +28,7 @@ interface CircleObstacle {
 const BALLS_TESTED = 64;
 const EDGE_PADDING = 24;
 const CUP_Y = 180;
-const BALL_RADIUS = 11;
+const BALL_RADIUS = 13;
 const MIN_COLLECTED_RATIO = 0.55;
 const MIN_REACHABLE_BIN_RATIO = 0.4;
 const MAX_STUCK_RATIO = 0.45;

@@ -43,7 +43,7 @@ type RevealableBoardElement = {
   visual: Phaser.GameObjects.Container;
   revealed: boolean;
 };
-const BALL_RADIUS = 11;
+const BALL_RADIUS = 13;
 const DRIP_INTERVAL_MS = 42;
 const BALLS_PER_DRIP = 1; // einzeln gespawnt, damit größere Bälle nicht direkt überlappen
 const STRONG_GATE_THRESHOLD = 3;
@@ -156,22 +156,63 @@ export class DropScene extends Phaser.Scene {
   update(): void {
     this.updateBoardMotion();
 
-    // Wischspur / Motion Blur für alle Bälle
+    // Bälle bleiben rund; der Geschwindigkeitseindruck kommt über separate Schweif-Partikel.
+    let trailsThisFrame = 0;
     for (const go of this.active) {
-      if (go.body) {
-        const body = go.body as MatterJS.BodyType;
-        const vx = body.velocity.x;
-        const vy = body.velocity.y;
-        const speed = Math.sqrt(vx * vx + vy * vy);
-        // Ziehe den Ball anhand seiner Geschwindigkeit in die Länge
-        go.scaleY = 1 + speed * 0.04;
-        go.scaleX = Math.max(0.6, 1 - speed * 0.015);
-        go.rotation = Math.atan2(vy, vx) - Math.PI / 2;
+      if (!go.body) continue;
+      const body = go.body as MatterJS.BodyType;
+      const vx = body.velocity.x;
+      const vy = body.velocity.y;
+      const speed = Math.sqrt(vx * vx + vy * vy);
+      go.setScale(1);
+      go.rotation = 0;
+      if (trailsThisFrame < 8 && this.maybeRenderBallTrail(go, vx, vy, speed)) {
+        trailsThisFrame += 1;
       }
     }
 
     if (this.finished || !this.releasing) return;
     this.topBar.refresh();
+  }
+
+  private maybeRenderBallTrail(
+    go: Phaser.GameObjects.Arc,
+    vx: number,
+    vy: number,
+    speed: number,
+  ): boolean {
+    if (speed < 2.8) return false;
+    const lastTrailAt = Number(go.getData('trailAt') ?? 0);
+    if (this.time.now - lastTrailAt < 65) return false;
+    go.setData('trailAt', this.time.now);
+
+    const length = Math.min(42, BALL_RADIUS * 1.25 + speed * 3.2);
+    const invSpeed = 1 / Math.max(speed, 0.001);
+    const backX = -vx * invSpeed;
+    const backY = -vy * invSpeed;
+
+    for (let i = 0; i < 3; i += 1) {
+      const step = (i + 1) / 3;
+      const trail = this.add
+        .circle(
+          go.x + backX * length * step,
+          go.y + backY * length * step,
+          BALL_RADIUS * (0.82 - step * 0.24),
+          0xffffff,
+          0.26 - step * 0.06,
+        )
+        .setDepth(go.depth - 1);
+      this.tweens.add({
+        targets: trail,
+        alpha: 0,
+        scale: 0.35,
+        duration: 155 + i * 35,
+        ease: 'Sine.easeOut',
+        onComplete: () => trail.destroy(),
+      });
+    }
+
+    return true;
   }
 
   // Oben angezeigte Ballzahl: vor dem Start die Munition, danach die Bälle im Spiel.
