@@ -47,15 +47,6 @@ export const BOOSTER_COST = 18;
 const BOOSTER_SEGMENT_COLOR = 0x2f80ff;
 export const MYSTERY_COST = 14;
 export const BLOCKER_RISK_CREDIT = 8;
-export const MAX_MULTIPLIER_BY_DIFFICULTY: ReadonlyArray<{
-  maxDifficulty: number;
-  multiplier: number;
-}> = [
-  { maxDifficulty: 3, multiplier: 3 },
-  { maxDifficulty: 5, multiplier: 5 },
-  { maxDifficulty: 8, multiplier: 8 },
-  { maxDifficulty: Number.POSITIVE_INFINITY, multiplier: 10 },
-];
 
 // Struktur-Modi sind die "Persönlichkeiten", die der Generator aus dem einen
 // Template ableitet: ruhige Kaskade, Links/Rechts-Split, dichte Wand oder
@@ -454,32 +445,23 @@ function buildPegs(rng: Rng, challenge: number, template: ResolvedBoard): PegDef
   return pegs;
 }
 
-function maxMultiplierForDifficulty(challenge: number): number {
-  return (
-    MAX_MULTIPLIER_BY_DIFFICULTY.find((entry) => challenge <= entry.maxDifficulty)?.multiplier ?? 5
-  );
-}
+// Multiplikator-Werte sind bewusst wellen-/level-unabhängig: jeder Balken
+// würfelt frei X2–X9, niedrige Werte häufig, hohe selten (belohnende
+// Ausreißer). Die Schwierigkeitsprogression läuft über Budget (Anzahl der
+// Balken), Risiko-Profil und Bin-Verteilung — nicht über die Wertobergrenze.
+const MULTIPLIER_WEIGHTS: ReadonlyArray<{ value: number; weight: number }> = [
+  { value: 2, weight: 26 },
+  { value: 3, weight: 22 },
+  { value: 4, weight: 16 },
+  { value: 5, weight: 11 },
+  { value: 6, weight: 8 },
+  { value: 7, weight: 6 },
+  { value: 8, weight: 4 },
+  { value: 9, weight: 2 },
+];
 
-function effectValue(_kind: 'multiply', challenge: number, rng: Rng, riskScore = 0): number {
-  const maxMultiplier = maxMultiplierForDifficulty(challenge);
-  const isEarlyOrSafe = challenge <= 3 || riskScore <= 2.5;
-  const riskTier = clamp(Math.floor((riskScore - 2.5) / 1.4), 0, 4);
-  const challengeTier = Math.floor((challenge - 1) / 3);
-
-  if (isEarlyOrSafe) {
-    return clamp(
-      2 + (challenge >= 5 && rng.next() < 0.35 ? 1 : 0),
-      2,
-      Math.min(3, maxMultiplier),
-    );
-  }
-
-  const visibilityBonus = rng.weightedPick([0, 1, 2, 3], (bonus) =>
-    bonus === 0 ? 2 : bonus === 1 ? 5 : bonus === 2 ? 4 : 2,
-  );
-  const value = 2 + challengeTier + riskTier + visibilityBonus;
-
-  return clamp(value, 2, maxMultiplier);
+function rollMultiplier(rng: Rng): number {
+  return rng.weightedPick([...MULTIPLIER_WEIGHTS], (entry) => entry.weight).value;
 }
 
 function effectFor(kind: 'multiply' | 'add', value: number) {
@@ -509,15 +491,18 @@ function slotRiskScore(
   return sideRisk * 3 + depthRisk * 2 + narrowRisk * 2 + blockerCount * 0.5 - wideSafety * 2;
 }
 
-function gateCost(_kind: 'multiply', value: number): number {
-  return GATE_COSTS.multiply + (value - 2) * GATE_COSTS.multiplierStep;
+// Kosten sind bewusst wertunabhängig (flach), damit ein zufällig hoher
+// Multiplikator nicht am Budget scheitert und übersprungen wird. Das Budget
+// begrenzt nur die Anzahl der Balken, nicht ihre Werte.
+function gateCost(): number {
+  return GATE_COSTS.multiply;
 }
 
-function platformCost(_kind: 'multiply', value: number, width: number): number {
-  const base = PLATFORM_COSTS.multiply + (value - 2) * PLATFORM_COSTS.multiplierStep;
+function platformCost(width: number): number {
   return Math.max(
     1,
-    base - (width >= PLATFORM_COSTS.widthDiscountThreshold ? PLATFORM_COSTS.wideDiscount : 0),
+    PLATFORM_COSTS.multiply -
+      (width >= PLATFORM_COSTS.widthDiscountThreshold ? PLATFORM_COSTS.wideDiscount : 0),
   );
 }
 
@@ -534,10 +519,9 @@ function segmentColor(colorRole: SegmentColorRole | undefined, kind: SegmentKind
   return 0xf2a91c;
 }
 
-function segmentValue(segment: SegmentDef, rng: Rng, challenge: number): number {
+function segmentValue(segment: SegmentDef, rng: Rng): number {
   const [min, max] = segment.valueRange;
-  const cappedMax = Math.min(max, maxMultiplierForDifficulty(challenge));
-  return rng.intBetween(Math.min(min, cappedMax), Math.max(min, cappedMax));
+  return rng.intBetween(Math.min(min, max), Math.max(min, max));
 }
 
 function segmentLabel(kind: SegmentKind, value: number): string {
@@ -550,9 +534,9 @@ function segmentEffect(kind: SegmentKind, value: number, challenge: number) {
   return effectFor(kind, value);
 }
 
-function segmentCost(segment: SegmentDef, value: number): number {
+function segmentCost(segment: SegmentDef): number {
   if (segment.kind === 'mystery') return MYSTERY_COST;
-  return platformCost(segment.kind, value, segment.width);
+  return platformCost(segment.width);
 }
 
 function buildSegmentRow(
@@ -569,8 +553,8 @@ function buildSegmentRow(
   const rowY = clamp(y + jitter(rng, 8), SAFE_TOP_Y, SAFE_BOTTOM_Y);
 
   for (const segment of orderedSegments) {
-    const value = segmentValue(segment, rng, challenge);
-    if (budget && !spendBudget(budget, segmentCost(segment, value))) continue;
+    const value = segmentValue(segment, rng);
+    if (budget && !spendBudget(budget, segmentCost(segment))) continue;
 
     const halfWidth = segment.width / 2;
     platforms.push({
@@ -703,8 +687,8 @@ function buildPatternObjects(
   const gates: GateDef[] = [];
   const platforms: BoardPlatformDef[] = [];
   for (const { slot, riskScore } of gateCandidates) {
-    const value = effectValue(slot.kind, challenge, rng, riskScore);
-    if (!spendBudget(budget, gateCost(slot.kind, value))) continue;
+    const value = rollMultiplier(rng);
+    if (!spendBudget(budget, gateCost())) continue;
     const prefix = slot.kind === 'multiply' ? 'X' : 'Bonus';
     const useMystery =
       options.allowMystery !== false && challenge >= 5 && riskScore >= 5.25 && rng.next() < 0.08;
@@ -742,8 +726,8 @@ function buildPatternObjects(
         : a.riskScore - b.riskScore;
     });
   for (const { slot, riskScore } of platformCandidates) {
-    const value = effectValue(slot.labelKind, challenge, rng, riskScore);
-    if (!spendBudget(budget, platformCost(slot.labelKind, value, slot.w))) continue;
+    const value = rollMultiplier(rng);
+    if (!spendBudget(budget, platformCost(slot.w))) continue;
     const prefix = slot.labelKind === 'multiply' ? 'X' : 'Bonus';
     const useMystery =
       options.allowMystery !== false && challenge >= 5 && riskScore >= 4 && rng.next() < 0.22;
