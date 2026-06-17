@@ -207,15 +207,29 @@ export function renderMultiplierBar(
   if (label.includes('?')) {
     for (let ix = -width / 2 + 18; ix < width / 2; ix += 42) {
       container.add(
-        renderBoardLabel(scene, ix, 1, '?', '30px').setRotation(ix % 84 === 0 ? -0.2 : 0.18),
+        renderBoardLabel(scene, ix, 1, '?', '30px')
+          .setName('barLabel')
+          .setRotation(ix % 84 === 0 ? -0.2 : 0.18),
       );
     }
   } else if (label.includes('BOOST') || label.includes('▲')) {
-    container.add(renderBoardLabel(scene, 0, -1, '⌃⌃', '34px'));
+    container.add(renderBoardLabel(scene, 0, -1, '⌃⌃', '34px').setName('barLabel'));
   } else {
-    container.add(renderBoardLabel(scene, 0, -1, label, '34px'));
+    container.add(renderBoardLabel(scene, 0, -1, label, '34px').setName('barLabel'));
   }
   return container;
+}
+
+export function revealMultiplierBarLabel(
+  scene: Phaser.Scene,
+  container: Phaser.GameObjects.Container,
+  label: string,
+): void {
+  const existingLabels = container
+    .getAll()
+    .filter((child) => child.name === 'barLabel') as Phaser.GameObjects.GameObject[];
+  existingLabels.forEach((child) => child.destroy());
+  container.add(renderBoardLabel(scene, 0, -1, label, '34px').setName('barLabel'));
 }
 
 export function renderGate(

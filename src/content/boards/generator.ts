@@ -609,6 +609,45 @@ function buildSegmentRow(
   return { platforms, blockers };
 }
 
+function overlapsVertically(
+  aCenterY: number,
+  aHeight: number,
+  bCenterY: number,
+  bHeight: number,
+): boolean {
+  return Math.abs(aCenterY - bCenterY) < (aHeight + bHeight) / 2;
+}
+
+function isBlockerInsidePlatformInterior(
+  blocker: BoardBlockerDef,
+  platform: BoardPlatformDef,
+): boolean {
+  if ((platform.angle ?? 0) !== 0 || (blocker.angle ?? 0) !== 0) return false;
+  if (!overlapsVertically(blocker.y, blocker.h, platform.y, platform.h)) return false;
+
+  const leftEdge = platform.x - platform.w / 2;
+  const rightEdge = platform.x + platform.w / 2;
+  const edgeTolerance = blocker.w / 2 + 12;
+  const isNearSegmentEdge =
+    Math.abs(blocker.x - leftEdge) <= edgeTolerance ||
+    Math.abs(blocker.x - rightEdge) <= edgeTolerance;
+
+  return (
+    blocker.x > leftEdge + edgeTolerance &&
+    blocker.x < rightEdge - edgeTolerance &&
+    !isNearSegmentEdge
+  );
+}
+
+function removeBlockersInsideMultiplierBars(
+  blockers: BoardBlockerDef[],
+  platforms: BoardPlatformDef[],
+): BoardBlockerDef[] {
+  return blockers.filter(
+    (blocker) => !platforms.some((platform) => isBlockerInsidePlatformInterior(blocker, platform)),
+  );
+}
+
 function buildPatternObjects(
   template: BoardTemplate,
   rng: Rng,
@@ -673,14 +712,37 @@ function buildPatternObjects(
     segmentBlockers.push(...segmentObjects.blockers);
   }
 
-  const ramps: BoardRampDef[] = template.rampSlots.map((slot) => ({
-    x: Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 14)),
-    y: clamp(slot.y + jitter(rng, 14), SAFE_TOP_Y, SAFE_BOTTOM_Y),
-    w: slot.w,
-    h: 30,
-    angle: clamp(slot.angle + jitter(rng, 4), template.rampAngles.min, template.rampAngles.max),
-    color: 0xbf7134,
-  }));
+  const rampAnchorBlockers: BoardBlockerDef[] = [];
+  const ramps: BoardRampDef[] = template.rampSlots.map((slot) => {
+    const angle = clamp(
+      slot.angle + jitter(rng, 4),
+      template.rampAngles.min,
+      template.rampAngles.max,
+    );
+    const x = Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 14));
+    const y = clamp(slot.y + jitter(rng, 14), SAFE_TOP_Y, SAFE_BOTTOM_Y);
+    const angleRad = (angle * Math.PI) / 180;
+    const highEndDirection = Math.sin(angleRad) >= 0 ? -1 : 1;
+    const anchorX = x + Math.cos(angleRad) * (slot.w / 2) * highEndDirection;
+    const anchorY = y + Math.sin(angleRad) * (slot.w / 2) * highEndDirection;
+    rampAnchorBlockers.push({
+      x: clamp(Math.round(anchorX), 40, GAME_WIDTH - 40),
+      y: clamp(Math.round(anchorY - 42), SAFE_TOP_Y, SAFE_BOTTOM_Y),
+      w: 30,
+      h: 104,
+      angle: 0,
+      color: 0xbf7134,
+    });
+
+    return {
+      x,
+      y,
+      w: slot.w,
+      h: 30,
+      angle,
+      color: 0xbf7134,
+    };
+  });
 
   const boosters: BoardBoosterDef[] = [];
   for (const slot of options.allowBoosters === false ? [] : template.boosterSlots) {
@@ -704,9 +766,10 @@ function buildPatternObjects(
     angle: slot.angle,
     color: 0xbf7134,
   }));
-  blockers.push(...segmentBlockers);
+  blockers.push(...segmentBlockers, ...rampAnchorBlockers);
+  const cleanBlockers = removeBlockersInsideMultiplierBars(blockers, platforms);
 
-  return { gates, platforms, ramps, boosters, blockers };
+  return { gates, platforms, ramps, boosters, blockers: cleanBlockers };
 }
 
 function buildBins(

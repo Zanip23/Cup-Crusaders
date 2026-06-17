@@ -19,6 +19,7 @@ import {
   renderCup,
   renderGate,
   renderMultiplierBar,
+  revealMultiplierBarLabel,
   renderPeg,
   renderStageBackground,
   renderWoodBeam,
@@ -38,10 +39,13 @@ type MovingBoardElement = {
   baseY: number;
   motion: BoardMotionDef;
 };
+type RevealableBoardElement = {
+  visual: Phaser.GameObjects.Container;
+  revealed: boolean;
+};
 const BALL_RADIUS = 7;
 const DRIP_INTERVAL_MS = 22;
 const BALLS_PER_DRIP = 2; // mehrere Bälle pro Tick → dichter Strom (Masse)
-const MAX_BONUS_BALLS_PER_GATE = 6; // höhere Multiplikatoren (x8) wirken spürbar
 const STRONG_GATE_THRESHOLD = 3;
 const SPIN_TIMEOUT_MS = 10000; // harte Timeout-Sicherung: Phase endet garantiert
 const NO_CATCH_END_MS = 800; // Becher füllt sich seit 0,8s nicht mehr → Phase beenden
@@ -66,6 +70,7 @@ export class DropScene extends Phaser.Scene {
   private sumText!: Phaser.GameObjects.Text;
   private topBar!: TopBar;
   private speedButton?: Phaser.GameObjects.Container;
+  private readonly revealableBoardElements = new Map<string, RevealableBoardElement>();
   private speedIndex = 0;
   private lastFxTotal = 0; // gedrosseltes Catch-FX: zeigt „+N" pro Burst
   private lastFxAt = 0;
@@ -302,6 +307,7 @@ export class DropScene extends Phaser.Scene {
         platform.color ?? gateColor(platform.label),
       );
       this.trackBoardMotion(body, visual, platform.x, platform.y, platform.motion);
+      this.trackRevealableBoardElement(`platform:${i}`, visual, platform.label);
     });
 
     this.board.boosters?.forEach((booster, i) => {
@@ -322,6 +328,7 @@ export class DropScene extends Phaser.Scene {
         booster.color ?? gateColor(booster.label),
       );
       this.trackBoardMotion(body, visual, booster.x, booster.y, booster.motion);
+      this.trackRevealableBoardElement(`booster:${i}`, visual, booster.label);
     });
 
     // Tore (Sensoren) als breite, farbige Multiplikator-Balken.
@@ -333,7 +340,17 @@ export class DropScene extends Phaser.Scene {
       });
       const visual = renderGate(this, g);
       this.trackBoardMotion(body, visual, g.x, g.y, g.motion);
+      this.trackRevealableBoardElement(`gate:${i}`, visual, g.label);
     });
+  }
+
+  private trackRevealableBoardElement(
+    id: string,
+    visual: Phaser.GameObjects.Container,
+    label: string,
+  ): void {
+    if (!label.includes('?')) return;
+    this.revealableBoardElements.set(id, { visual, revealed: false });
   }
 
   private trackBoardMotion(
@@ -686,6 +703,8 @@ export class DropScene extends Phaser.Scene {
 
     if (effect.type === 'gateMystery') {
       const mystery = pickMysteryEffect(effect, () => Phaser.Math.FloatBetween(0, 1));
+      const revealedLabel = this.revealedLabelForMystery(mystery);
+      this.revealMysteryElement(id, revealedLabel);
       playGateFx(this, go.x, go.y, mystery.label, Boolean(mystery.strong));
 
       if (mystery.kind === 'loseBall') {
@@ -702,6 +721,22 @@ export class DropScene extends Phaser.Scene {
     this.applyGateReward(go, passed, effect, true);
   }
 
+  private revealMysteryElement(id: string, label: string): void {
+    const element = this.revealableBoardElements.get(id);
+    if (!element || element.revealed) return;
+    revealMultiplierBarLabel(this, element.visual, label);
+    element.revealed = true;
+  }
+
+  private revealedLabelForMystery(mystery: ReturnType<typeof pickMysteryEffect>): string {
+    if (mystery.kind === 'loseBall') return '0';
+    if (mystery.effect.type === 'gateMultiply') {
+      return `X${Math.max(1, Math.floor(Number(mystery.effect.params.factor ?? 1)))}`;
+    }
+    if (mystery.effect.type === 'gateAdd') return 'Bonus';
+    return '???';
+  }
+
   private applyGateReward(
     go: Phaser.GameObjects.Arc,
     passed: Set<string>,
@@ -710,7 +745,7 @@ export class DropScene extends Phaser.Scene {
   ): void {
     if (effect.type === 'gateMultiply') {
       const factor = Math.max(1, Math.floor(Number(effect.params.factor ?? 1)));
-      const bonusCount = Math.min(factor - 1, MAX_BONUS_BALLS_PER_GATE);
+      const bonusCount = factor - 1;
       this.spawnBonusBalls(go, bonusCount, passed);
       if (showFx) playGateFx(this, go.x, go.y, `x${factor}!`, factor >= STRONG_GATE_THRESHOLD);
       return;
@@ -718,7 +753,7 @@ export class DropScene extends Phaser.Scene {
 
     if (effect.type === 'gateAdd') {
       const amount = Math.max(0, Math.floor(Number(effect.params.amount ?? 0)));
-      const bonusCount = Math.min(amount, MAX_BONUS_BALLS_PER_GATE);
+      const bonusCount = amount;
       this.spawnBonusBalls(go, bonusCount, passed);
       if (showFx) playGateFx(this, go.x, go.y, `+${bonusCount}!`, true);
     }
@@ -730,7 +765,7 @@ export class DropScene extends Phaser.Scene {
     inheritedGates?: Set<string>,
   ): void {
     const availableSlots = this.board.maxConcurrentBalls - this.active.size;
-    const spawnCount = Math.max(0, Math.min(count, MAX_BONUS_BALLS_PER_GATE, availableSlots));
+    const spawnCount = Math.max(0, Math.min(count, availableSlots));
     if (spawnCount <= 0) return;
 
     const sourceBody = sourceBall.body as MatterBody | null;
