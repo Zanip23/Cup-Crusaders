@@ -609,43 +609,77 @@ function buildSegmentRow(
   return { platforms, blockers };
 }
 
-function overlapsVertically(
-  aCenterY: number,
-  aHeight: number,
-  bCenterY: number,
-  bHeight: number,
-): boolean {
-  return Math.abs(aCenterY - bCenterY) < (aHeight + bHeight) / 2;
+interface BoardObjectBounds {
+  x: number;
+  y: number;
+  halfW: number;
+  halfH: number;
 }
 
-function isBlockerInsidePlatformInterior(
-  blocker: BoardBlockerDef,
-  platform: BoardPlatformDef,
-): boolean {
-  if ((platform.angle ?? 0) !== 0 || (blocker.angle ?? 0) !== 0) return false;
-  if (!overlapsVertically(blocker.y, blocker.h, platform.y, platform.h)) return false;
-
-  const leftEdge = platform.x - platform.w / 2;
-  const rightEdge = platform.x + platform.w / 2;
-  const edgeTolerance = blocker.w / 2 + 12;
-  const isNearSegmentEdge =
-    Math.abs(blocker.x - leftEdge) <= edgeTolerance ||
-    Math.abs(blocker.x - rightEdge) <= edgeTolerance;
-
-  return (
-    blocker.x > leftEdge + edgeTolerance &&
-    blocker.x < rightEdge - edgeTolerance &&
-    !isNearSegmentEdge
-  );
+function rotatedBounds(
+  object: { x: number; y: number; w: number; h: number; angle?: number },
+  padding = 0,
+): BoardObjectBounds {
+  const angle = Math.abs(((object.angle ?? 0) * Math.PI) / 180);
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return {
+    x: object.x,
+    y: object.y,
+    halfW: (Math.abs(object.w * cos) + Math.abs(object.h * sin)) / 2 + padding,
+    halfH: (Math.abs(object.w * sin) + Math.abs(object.h * cos)) / 2 + padding,
+  };
 }
 
-function removeBlockersInsideMultiplierBars(
+function boundsOverlap(a: BoardObjectBounds, b: BoardObjectBounds): boolean {
+  return Math.abs(a.x - b.x) < a.halfW + b.halfW && Math.abs(a.y - b.y) < a.halfH + b.halfH;
+}
+
+function overlapsBoardObject(
+  a: { x: number; y: number; w: number; h: number; angle?: number },
+  b: { x: number; y: number; w: number; h: number; angle?: number },
+  padding = 10,
+): boolean {
+  return boundsOverlap(rotatedBounds(a, padding), rotatedBounds(b, padding));
+}
+
+function objectArea(object: { w: number; h: number }): number {
+  return object.w * object.h;
+}
+
+function removeVisualCollisions(
   blockers: BoardBlockerDef[],
   platforms: BoardPlatformDef[],
-): BoardBlockerDef[] {
-  return blockers.filter(
-    (blocker) => !platforms.some((platform) => isBlockerInsidePlatformInterior(blocker, platform)),
+  ramps: BoardRampDef[],
+): { blockers: BoardBlockerDef[]; ramps: BoardRampDef[] } {
+  const cleanRamps = ramps.filter(
+    (ramp) => !platforms.some((platform) => overlapsBoardObject(ramp, platform, 14)),
   );
+  const cleanBlockers: BoardBlockerDef[] = [];
+
+  for (const blocker of blockers) {
+    const touchesPlatform = platforms.some((platform) =>
+      overlapsBoardObject(blocker, platform, 12),
+    );
+    const touchesRamp = cleanRamps.some((ramp) => overlapsBoardObject(blocker, ramp, 10));
+    const touchesBlocker = cleanBlockers.some((existing) =>
+      overlapsBoardObject(blocker, existing, 8),
+    );
+    if (!touchesPlatform && !touchesRamp && !touchesBlocker) cleanBlockers.push(blocker);
+  }
+
+  const finalRamps = cleanRamps.filter(
+    (ramp) => !cleanBlockers.some((blocker) => overlapsBoardObject(ramp, blocker, 10)),
+  );
+  const sortedRamps = finalRamps.sort((a, b) => objectArea(b) - objectArea(a));
+  const nonOverlappingRamps: BoardRampDef[] = [];
+  for (const ramp of sortedRamps) {
+    if (!nonOverlappingRamps.some((existing) => overlapsBoardObject(ramp, existing, 8))) {
+      nonOverlappingRamps.push(ramp);
+    }
+  }
+
+  return { blockers: cleanBlockers, ramps: nonOverlappingRamps };
 }
 
 function buildPatternObjects(
@@ -767,9 +801,9 @@ function buildPatternObjects(
     color: 0xbf7134,
   }));
   blockers.push(...segmentBlockers, ...rampAnchorBlockers);
-  const cleanBlockers = removeBlockersInsideMultiplierBars(blockers, platforms);
+  const cleanObjects = removeVisualCollisions(blockers, platforms, ramps);
 
-  return { gates, platforms, ramps, boosters, blockers: cleanBlockers };
+  return { gates, platforms, ramps: cleanObjects.ramps, boosters, blockers: cleanObjects.blockers };
 }
 
 function buildBins(
