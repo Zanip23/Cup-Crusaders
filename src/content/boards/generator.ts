@@ -795,6 +795,7 @@ function buildPatternObjects(
       w: slot.w,
       h: 30,
       angle,
+      label: slot.label,
       color: 0xbf7134,
     };
   });
