@@ -74,6 +74,22 @@ describe('Level-Progression (docs/11)', () => {
     }
   });
 
+  it('resolveBoardForDrop wechselt das Board nach jeder normalen Welle sichtbar', () => {
+    const boards = [1, 2, 3, 4, 5].map((wave) => resolveBoardForDrop('world_1', wave, 1234));
+
+    expect(boards[0].id).toContain('bar_cascade_early');
+    expect(boards[1].id).toContain('side_switch_early');
+    expect(boards[2].id).toContain('bar_cascade_early');
+    expect(boards[3].id).toContain('side_switch_early');
+    expect(boards[4].id).toContain('bar_cascade_early');
+    for (let i = 1; i < boards.length; i++) {
+      expect(boards[i].id).not.toBe(boards[i - 1].id);
+      expect(boards[i].platforms?.map((platform) => platform.x)).not.toEqual(
+        boards[i - 1].platforms?.map((platform) => platform.x),
+      );
+    }
+  });
+
   it('ADVANCE_LEVEL setzt Welle/Transfer zurück, behält Upgrades', () => {
     let s = reducer(createInitialState(), {
       type: 'START_RUN',
