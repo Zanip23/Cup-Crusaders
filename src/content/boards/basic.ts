@@ -9,14 +9,14 @@ import type { BoardDef, BoardBlockerDef, BoardPlatformDef, Effect } from '@/type
 import { GAME_WIDTH } from '@/ui/layout';
 
 const W = GAME_WIDTH;
-const POST = 0x9a6738; // Holzpfosten-Braun
+const POST = 0xbf7134; // warmes Holzpfosten-Braun
 
 // Farbschema der Balken nach Wirkung (wie Referenz).
 const BAR_COLOR = {
-  mult: 0xf4c430, // amber: x2/x3 …
-  high: 0x36d66b, // grün: hohe Multiplikatoren / Bonus
-  mystery: 0x9a5cff, // lila: ???
-  boost: 0x4cc9f0, // blau: ⌃ Boost
+  mult: 0xf2a91c, // amber: x2/x3 …
+  high: 0x20b457, // grün: hohe Multiplikatoren / Bonus
+  mystery: 0x7b4ee6, // lila: ???
+  boost: 0x18aeea, // blau: ⌃ Boost
 } as const;
 
 function defaultBins() {
@@ -48,12 +48,12 @@ function bar(
   effect: Effect,
   color: number,
 ): BoardPlatformDef {
-  return { x, y, w, h: 30, label, effect, color };
+  return { x, y, w, h: 44, label: label.toUpperCase(), effect, color };
 }
 
 // Kurzer vertikaler Leitpfosten (hängt von einer Balkenreihe herab).
 function post(x: number, y: number, h = 96): BoardBlockerDef {
-  return { x, y, w: 16, h, color: POST };
+  return { x, y, w: 30, h, color: POST };
 }
 
 export const BOARD_BASIC: BoardDef = {
@@ -81,7 +81,7 @@ export const BOARD_BASIC: BoardDef = {
       y: 820,
       w: 168,
       h: 34,
-      label: '▲ BOOST',
+      label: 'BOOST',
       effect: mult(2),
       color: BAR_COLOR.boost,
     },
@@ -125,7 +125,7 @@ export const BOARD_DENSE: BoardDef = {
       y: 800,
       w: 150,
       h: 32,
-      label: '▲ BOOST',
+      label: 'BOOST',
       effect: mult(2),
       color: BAR_COLOR.boost,
     },

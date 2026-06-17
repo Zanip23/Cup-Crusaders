@@ -528,9 +528,9 @@ function spendBudget(budget: { remaining: number }, cost: number): boolean {
 
 function segmentColor(colorRole: SegmentColorRole | undefined, kind: SegmentKind): number {
   const role = colorRole ?? (kind === 'add' ? 'bonus' : kind);
-  if (role === 'bonus') return 0x36d66b;
-  if (role === 'mystery') return 0x9a5cff;
-  return 0xf4c430;
+  if (role === 'bonus') return 0x20b457;
+  if (role === 'mystery') return 0x7b4ee6;
+  return 0xf2a91c;
 }
 
 function segmentValue(segment: SegmentDef, rng: Rng, challenge: number): number {
@@ -543,7 +543,7 @@ function segmentValue(segment: SegmentDef, rng: Rng, challenge: number): number 
 function segmentLabel(kind: SegmentKind, value: number): string {
   if (kind === 'mystery') return '???';
   if (kind === 'add') return 'Bonus';
-  return `x${value}`;
+  return `X${value}`;
 }
 
 function segmentEffect(kind: SegmentKind, value: number, challenge: number) {
@@ -582,8 +582,8 @@ function buildSegmentRow(
       ),
       y: rowY,
       w: segment.width,
-      h: 28,
-      angle: jitter(rng, 2),
+      h: 44,
+      angle: 0,
       label: segmentLabel(segment.kind, value),
       effect: segmentEffect(segment.kind, value, challenge),
       color: segmentColor(segment.colorRole, segment.kind),
@@ -599,11 +599,10 @@ function buildSegmentRow(
     blockers.push({
       x: clamp(boundaryX, edgePadding, GAME_WIDTH - edgePadding),
       y: clamp(rowY + 38, SAFE_TOP_Y, SAFE_BOTTOM_Y),
-      w: 14,
-      h: clamp(86 + challenge * 4 + jitter(rng, 10), 86, 138),
+      w: 30,
+      h: clamp(96 + challenge * 4 + jitter(rng, 10), 96, 148),
       angle: 0,
-      label: 'split',
-      color: 0x7a4a24,
+      color: 0xbf7134,
     });
   }
 
@@ -627,16 +626,16 @@ function buildPatternObjects(
   for (const { slot, riskScore } of gateCandidates) {
     const value = effectValue(slot.kind, challenge, rng, riskScore);
     if (!spendBudget(budget, gateCost(slot.kind, value))) continue;
-    const prefix = slot.kind === 'multiply' ? 'x' : '+';
+    const prefix = slot.kind === 'multiply' ? 'X' : 'Bonus';
     const useMystery =
       options.allowMystery !== false && challenge >= 4 && riskScore >= 4.5 && rng.next() < 0.28;
     gates.push({
       ...zoneAwarePoint(slot, template.gateZones, rng, 18, 18),
-      w: 76,
-      h: 24,
-      label: useMystery ? '???' : `${prefix}${value}`,
+      w: 96,
+      h: 44,
+      label: useMystery ? '???' : slot.kind === 'multiply' ? `${prefix}${value}` : prefix,
       effect: useMystery ? mysteryEffectFor(challenge) : effectFor(slot.kind, value),
-      color: useMystery ? 0x9a5cff : undefined,
+      color: useMystery ? 0x7b4ee6 : undefined,
     });
   }
 
@@ -652,18 +651,18 @@ function buildPatternObjects(
   for (const { slot, riskScore } of platformCandidates) {
     const value = effectValue(slot.labelKind, challenge, rng, riskScore);
     if (!spendBudget(budget, platformCost(slot.labelKind, value, slot.w))) continue;
-    const prefix = slot.labelKind === 'multiply' ? 'x' : '+';
+    const prefix = slot.labelKind === 'multiply' ? 'X' : 'Bonus';
     const useMystery =
       options.allowMystery !== false && challenge >= 5 && riskScore >= 4 && rng.next() < 0.22;
     platforms.push({
       x: Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 20)),
       y: clamp(slot.y + jitter(rng, 16), SAFE_TOP_Y, SAFE_BOTTOM_Y),
       w: slot.w,
-      h: 26,
-      angle: jitter(rng, 5),
-      label: useMystery ? '???' : `${prefix}${value}`,
+      h: 44,
+      angle: 0,
+      label: useMystery ? '???' : slot.labelKind === 'multiply' ? `${prefix}${value}` : prefix,
       effect: useMystery ? mysteryEffectFor(challenge) : effectFor(slot.labelKind, value),
-      color: useMystery ? 0x9a5cff : slot.labelKind === 'multiply' ? 0xf4c430 : 0x36d66b,
+      color: useMystery ? 0x7b4ee6 : slot.labelKind === 'multiply' ? 0xf2a91c : 0x20b457,
     });
   }
 
@@ -678,10 +677,9 @@ function buildPatternObjects(
     x: Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 14)),
     y: clamp(slot.y + jitter(rng, 14), SAFE_TOP_Y, SAFE_BOTTOM_Y),
     w: slot.w,
-    h: 16,
+    h: 30,
     angle: clamp(slot.angle + jitter(rng, 4), template.rampAngles.min, template.rampAngles.max),
-    label: slot.label,
-    color: 0x9b5f2a,
+    color: 0xbf7134,
   }));
 
   const boosters: BoardBoosterDef[] = [];
@@ -689,23 +687,22 @@ function buildPatternObjects(
     if (!spendBudget(budget, BOOSTER_COST)) continue;
     boosters.push({
       ...zoneAwarePoint(slot, template.boosterPositions, rng, 16, 16),
-      w: 106,
-      h: 40,
+      w: 126,
+      h: 44,
       angle: slot.angle ?? 0,
       label: 'BOOST',
       effect: effectFor('add', clamp(2 + Math.floor(challenge / 2), 3, 8)),
-      color: 0xff4fd8,
+      color: 0x18aeea,
     });
   }
 
   const blockers: BoardBlockerDef[] = template.blockerSlots.map((slot) => ({
     x: Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 10)),
     y: clamp(slot.y + jitter(rng, 10), SAFE_TOP_Y, SAFE_BOTTOM_Y),
-    w: 14,
+    w: 30,
     h: slot.h,
     angle: slot.angle,
-    label: 'risk',
-    color: 0x7a4a24,
+    color: 0xbf7134,
   }));
   blockers.push(...segmentBlockers);
 

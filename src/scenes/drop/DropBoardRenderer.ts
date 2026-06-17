@@ -12,12 +12,17 @@ export const DROP_COLORS = {
   pinShadow: 0x02040a,
   pinOuter: 0xd7f3ff,
   pinCore: 0xffffff,
-  yellowGate: 0xf4c430,
-  greenGate: 0x36d66b,
-  blueGate: 0x4cc9f0,
+  yellowGate: 0xf2a91c,
+  greenGate: 0x20b457,
+  limeGate: 0x8db915,
+  blueGate: 0x18aeea,
+  mysteryGate: 0x7b4ee6,
   binFill: 0x101f35,
-  funnelWood: 0x9a6738,
-  funnelWoodLight: 0xd6a15a,
+  woodDark: 0x8f5429,
+  wood: 0xbf7134,
+  woodLight: 0xe39045,
+  funnelWood: 0xbf7134,
+  funnelWoodLight: 0xe39045,
   funnelMetal: 0xb8c7d9,
   jackpotGlow: 0xffd166,
   nearMiss: 0xff8c42,
@@ -103,57 +108,129 @@ export function renderBoardLabel(
   fontSize: string,
 ): Phaser.GameObjects.Text {
   return scene.add
-    .text(x, y + 1, label, {
+    .text(x, y + 1, normalizeGateLabel(label), {
       fontSize,
       color: '#ffffff',
-      fontStyle: 'bold',
-      stroke: '#182034',
-      strokeThickness: 5,
+      fontFamily: 'Arial, Helvetica, sans-serif',
+      fontStyle: '900',
+      stroke: '#000000',
+      strokeThickness: 3,
     })
     .setOrigin(0.5)
-    .setDepth(9);
+    .setDepth(14);
+}
+
+export function normalizeGateLabel(label: string): string {
+  if (label.toLowerCase().startsWith('x')) return label.toUpperCase();
+  if (label.includes('BOOST')) return '⌃⌃';
+  return label;
 }
 
 export function gateColor(label: string): number {
-  if (label.includes('4')) return DROP_COLORS.blueGate;
-  if (label.includes('3')) return DROP_COLORS.greenGate;
+  if (label.includes('?')) return DROP_COLORS.mysteryGate;
+  if (label.includes('8') || label.includes('6') || label.includes('5'))
+    return DROP_COLORS.greenGate;
+  if (label.includes('4')) return DROP_COLORS.limeGate;
+  if (label.includes('BOOST') || label.includes('▲')) return DROP_COLORS.blueGate;
   return DROP_COLORS.yellowGate;
+}
+
+export function renderWoodBeam(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  length: number,
+  thickness: number,
+  angleRad = 0,
+  depth = 10,
+): Phaser.GameObjects.Container {
+  const container = scene.add.container(x, y).setRotation(angleRad).setDepth(depth);
+  const shadow = scene.add.graphics();
+  shadow.fillStyle(DROP_COLORS.pinShadow, 0.38);
+  shadow.fillRoundedRect(-length / 2 + 5, -thickness / 2 + 7, length, thickness + 8, thickness / 2);
+
+  const body = scene.add.graphics();
+  body.fillStyle(DROP_COLORS.woodDark, 1);
+  body.fillRoundedRect(-length / 2, -thickness / 2, length, thickness, thickness / 2);
+  body.fillStyle(DROP_COLORS.wood, 1);
+  body.fillRoundedRect(
+    -length / 2 + 3,
+    -thickness / 2 + 2,
+    length - 6,
+    thickness - 7,
+    (thickness - 7) / 2,
+  );
+  body.fillStyle(DROP_COLORS.woodLight, 0.72);
+  body.fillRoundedRect(
+    -length / 2 + 9,
+    -thickness / 2 + 5,
+    length - 18,
+    Math.max(5, thickness * 0.2),
+    thickness * 0.12,
+  );
+  body.lineStyle(2, 0x7b431f, 0.35);
+  body.lineBetween(-length / 2 + 14, thickness * 0.12, length / 2 - 14, thickness * 0.12);
+  container.add([shadow, body]);
+  return container;
+}
+
+export function renderWoodPost(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  height: number,
+  width = 32,
+  angleRad = 0,
+): Phaser.GameObjects.Container {
+  return renderWoodBeam(scene, x, y, height, width, angleRad + Math.PI / 2, 13);
+}
+
+export function renderMultiplierBar(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  label: string,
+  color: number,
+): Phaser.GameObjects.Container {
+  const h = Math.max(42, height);
+  const container = scene.add.container(x, y).setDepth(11);
+  const shadow = scene.add.rectangle(5, 8, width, h + 4, DROP_COLORS.pinShadow, 0.42).setDepth(10);
+  const bar = scene.add.rectangle(0, 0, width, h, color, 1).setDepth(11);
+  const top = scene.add.rectangle(0, -h * 0.38, width, 5, 0xf8ef6a, 0.86).setDepth(12);
+  container.add([shadow, bar, top]);
+  const postHeight = h + 34;
+  container.add(renderWoodPost(scene, -width / 2, 0, postHeight, 28));
+  container.add(renderWoodPost(scene, width / 2, 0, postHeight, 28));
+
+  if (label.includes('?')) {
+    for (let ix = -width / 2 + 18; ix < width / 2; ix += 42) {
+      container.add(
+        renderBoardLabel(scene, ix, 1, '?', '30px').setRotation(ix % 84 === 0 ? -0.2 : 0.18),
+      );
+    }
+  } else if (label.includes('BOOST') || label.includes('▲')) {
+    container.add(renderBoardLabel(scene, 0, -1, '⌃⌃', '34px'));
+  } else {
+    container.add(renderBoardLabel(scene, 0, -1, label, '34px'));
+  }
+  return container;
 }
 
 export function renderGate(
   scene: Phaser.Scene,
   gate: BoardDef['gates'][number],
 ): Phaser.GameObjects.Container {
-  const fill = gate.color ?? gateColor(gate.label);
-  const container = scene.add.container(gate.x, gate.y);
-  container.add(
-    scene.add.rectangle(7, 8, gate.w + 18, gate.h + 12, DROP_COLORS.pinShadow, 0.42).setDepth(6),
+  return renderMultiplierBar(
+    scene,
+    gate.x,
+    gate.y,
+    gate.w,
+    gate.h,
+    gate.label,
+    gate.color ?? gateColor(gate.label),
   );
-  container.add(
-    scene.add
-      .rectangle(0, 0, gate.w + 12, gate.h + 10, fill, 0.95)
-      .setStrokeStyle(6, 0xffffff, 0.9)
-      .setDepth(7),
-  );
-  container.add(
-    scene.add
-      .rectangle(0, -gate.h * 0.2, gate.w - 10, Math.max(8, gate.h * 0.24), 0xffffff, 0.24)
-      .setDepth(8),
-  );
-  container.add(
-    scene.add
-      .text(0, 1, gate.label, {
-        fontSize: '32px',
-        color: '#ffffff',
-        fontStyle: 'bold',
-        stroke: '#182034',
-        strokeThickness: 6,
-      })
-      .setOrigin(0.5)
-      .setDepth(9),
-  );
-  container.setDepth(9);
-  return container;
 }
 
 export function renderFunnelRail(
