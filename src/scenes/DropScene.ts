@@ -84,8 +84,9 @@ export class DropScene extends Phaser.Scene {
   private readonly active = new Set<Phaser.GameObjects.Arc>();
   private dripTimer?: Phaser.Time.TimerEvent;
   private cupHintText?: Phaser.GameObjects.Text;
+  private cupPointerStartX = 0;
   private cupDragStartX = 0;
-  private cupWasDragged = false;
+  private activeCupPointerId?: number;
   private cupDisplayedAmmo = 0;
   private collisionHandler?: (e: Phaser.Physics.Matter.Events.CollisionStartEvent) => void;
   private readonly movingBoardElements: MovingBoardElement[] = [];
@@ -451,11 +452,16 @@ export class DropScene extends Phaser.Scene {
     const cupVisuals = renderCup(this, CENTER_X, CUP_Y, this.ammo);
     this.cup = cupVisuals.cup;
     this.cupAmmoText = cupVisuals.ammoText;
-    this.cup.setInteractive({ useHandCursor: true, draggable: true });
+    this.cup.setInteractive({ useHandCursor: true });
 
-    this.cup.on('pointerdown', () => {
+    // Virtueller Ein-Achsen-Joystick: Der Spieler kann an beliebiger Stelle
+    // drücken und horizontal ziehen. Der Becher folgt der Finger-Bewegung relativ
+    // zur Startposition; beim Loslassen startet immer der Drop.
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (this.releasing || this.finished || this.activeCupPointerId !== undefined) return;
+      this.activeCupPointerId = pointer.id;
+      this.cupPointerStartX = pointer.x;
       this.cupDragStartX = this.cup.x;
-      this.cupWasDragged = false;
       this.tweens.add({
         targets: this.cup,
         scaleX: 1.04,
@@ -465,33 +471,29 @@ export class DropScene extends Phaser.Scene {
       });
     });
 
-    // Drag (horizontal) bewegt den Becher direkt und kippt ihn leicht in Zugrichtung.
-    this.input.on(
-      'drag',
-      (_p: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject, dragX: number) => {
-        if (obj !== this.cup || this.releasing || this.finished) return;
-        const nextX = Phaser.Math.Clamp(dragX, 70, GAME_WIDTH - 70);
-        const delta = nextX - this.cup.x;
-        this.cup.x = nextX;
-        this.cup.rotation = Phaser.Math.Clamp(delta * 0.012, -0.16, 0.16);
-        if (Math.abs(this.cup.x - this.cupDragStartX) > 8) this.cupWasDragged = true;
-      },
-    );
-
-    this.input.on('dragend', (_p: Phaser.Input.Pointer, obj: Phaser.GameObjects.GameObject) => {
-      if (obj === this.cup) this.settleCupTilt();
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (this.releasing || this.finished || pointer.id !== this.activeCupPointerId) return;
+      const nextX = Phaser.Math.Clamp(
+        this.cupDragStartX + pointer.x - this.cupPointerStartX,
+        70,
+        GAME_WIDTH - 70,
+      );
+      const delta = nextX - this.cup.x;
+      this.cup.x = nextX;
+      this.cup.rotation = Phaser.Math.Clamp(delta * 0.012, -0.16, 0.16);
     });
 
-    // Tap auf den Becher startet den Drop; ein vorheriger Drag zählt nur als Positionieren.
-    this.cup.on('pointerup', () => {
+    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (pointer.id !== this.activeCupPointerId) return;
+      this.activeCupPointerId = undefined;
       this.settleCupTilt();
-      if (!this.cupWasDragged) this.release();
+      this.release();
     });
   }
 
   private buildControls(): void {
     this.cupHintText = this.add
-      .text(CENTER_X, CUP_Y + 66, 'Becher antippen oder ziehen • Space/Enter zum Start', {
+      .text(CENTER_X, CUP_Y + 66, 'Überall ziehen • Loslassen zum Start', {
         fontSize: '18px',
         color: '#d7f3ff',
         stroke: '#06111f',
