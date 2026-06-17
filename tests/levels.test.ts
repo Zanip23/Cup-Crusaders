@@ -84,22 +84,23 @@ describe('Level-Progression (docs/11)', () => {
   });
 
   it('resolveBoardForDrop erzeugt pro Run (Seed) sichtbar unterschiedliche Boards', () => {
-    // Gleiche Welle, verschiedene Run-Seeds → der Generator soll seed-gesteuert
-    // unterschiedliche Layouts (und über mehrere Seeds auch verschiedene
-    // Struktur-Templates) liefern, statt immer dasselbe Board zu zeigen.
+    // Gleiche Welle, verschiedene Run-Seeds → der Generator soll aus dem einen
+    // flexiblen Template seed-gesteuert unterschiedliche Layouts (und über
+    // mehrere Seeds auch verschiedene Struktur-Modi) auflösen, statt immer
+    // dasselbe Board zu zeigen.
     const seeds = [1, 7, 42, 1234, 9999, 555, 808, 31337];
-    const templatesForWave1 = new Set<string>();
+    const modesForWave1 = new Set<string>();
     const layoutsForWave1 = new Set<string>();
 
     for (const seed of seeds) {
       const board = resolveBoardForDrop('world_1', 1, seed);
-      const templateId = board.id.replace(/^board_generated_\d+_\d+_\d+_\d+_/, '');
-      templatesForWave1.add(templateId);
+      const mode = board.id.replace(/^board_generated_\d+_\d+_\d+_\d+_/, '');
+      modesForWave1.add(mode);
       layoutsForWave1.add((board.platforms ?? []).map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join('|'));
     }
 
-    // Über mehrere Runs müssen verschiedene Templates vorkommen ...
-    expect(templatesForWave1.size).toBeGreaterThan(1);
+    // Über mehrere Runs müssen verschiedene Struktur-Modi vorkommen ...
+    expect(modesForWave1.size).toBeGreaterThan(1);
     // ... und die konkreten Layouts dürfen sich nicht alle gleichen.
     expect(layoutsForWave1.size).toBeGreaterThan(1);
   });

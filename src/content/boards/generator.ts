@@ -1,6 +1,7 @@
 // Datengetriebener Board-Generator für Pachinko-Layouts.
 // Erzeugt deterministische Varianten aus Seed, Difficulty und Wave, hält Cup- und
-// Funnel-Zonen frei und nutzt bewusste Zonen/Pattern statt komplettem Zufall.
+// Funnel-Zonen frei und nutzt EIN flexibles Template (BOARD_TEMPLATE) als alleinige
+// Quelle dafür, wie ein Board aussehen kann.
 
 import { Rng } from '@/core/rng/Rng';
 import { createMysteryEffect, mysteryPoolIdForChallenge } from '@/content/boards/mysteryPools';
@@ -56,14 +57,10 @@ export const MAX_MULTIPLIER_BY_DIFFICULTY: ReadonlyArray<{
   { maxDifficulty: Number.POSITIVE_INFINITY, multiplier: 10 },
 ];
 
-export type BoardTemplateId =
-  | 'bar_cascade'
-  | 'side_switch'
-  | 'dense_multiplier_wall'
-  | 'bonus_lane'
-  | 'booster_lane'
-  | 'split_multiplier_row'
-  | 'bonus_split_row';
+// Struktur-Modi sind die "Persönlichkeiten", die der Generator aus dem einen
+// Template ableitet: ruhige Kaskade, Links/Rechts-Split, dichte Wand oder
+// Segment-Reihen mit nebeneinander liegenden Multiplikatoren.
+export type BoardStructureMode = 'cascade' | 'split' | 'wall' | 'segments';
 
 type RiskRewardProfile = 'safe' | 'balanced' | 'swingy' | 'highRisk';
 
@@ -97,14 +94,13 @@ interface SegmentDef {
   colorRole?: SegmentColorRole;
 }
 
-interface BoardTemplate {
-  id: BoardTemplateId;
+// Konkretes, aus dem flexiblen Template aufgelöstes Layout. Genau diese Form
+// konsumieren die Platzier-Funktionen (Plattformen, Rampen, Blocker, Bins).
+interface ResolvedBoard {
   pegZones: BoardZone[];
   gateZones: BoardZone[];
   rampAngles: { min: number; max: number };
-  boosterPositions: BoardZone[];
   binDistribution: BinDistribution;
-  riskRewardProfile: RiskRewardProfile;
 
   rampSlots: Array<{ xRatio: number; y: number; angle: number; w: number; label: string }>;
   platformSlots: Array<{ xRatio: number; y: number; w: number; labelKind: 'multiply' }>;
@@ -114,226 +110,75 @@ interface BoardTemplate {
   segmentRows?: SegmentRowDef[];
 }
 
-const NO_PEG_ZONES: BoardZone[] = [];
-const NO_GATE_ZONES: BoardZone[] = [];
-const FULL_BOOSTER_ZONE: BoardZone[] = [{ xMinRatio: 0.12, xMaxRatio: 0.88, yMin: 360, yMax: 880 }];
+const NO_ZONES: BoardZone[] = [];
 
-const BOARD_TEMPLATES: BoardTemplate[] = [
-  {
-    id: 'bar_cascade',
-    pegZones: NO_PEG_ZONES,
-    gateZones: NO_GATE_ZONES,
-    rampAngles: { min: -20, max: 20 },
-    boosterPositions: FULL_BOOSTER_ZONE,
-    binDistribution: { outer: 0.95, shoulder: 1.05, center: 1.15, mysteryCenterFromChallenge: 7 },
-    riskRewardProfile: 'balanced',
-    rampSlots: [
-      { xRatio: 0.18, y: 425, angle: -16, w: 150, label: 'guide' },
-      { xRatio: 0.82, y: 795, angle: 16, w: 150, label: 'guide' },
-    ],
-    platformSlots: [
-      { xRatio: 0.5, y: 365, w: 520, labelKind: 'multiply' },
-      { xRatio: 0.34, y: 520, w: 310, labelKind: 'multiply' },
-      { xRatio: 0.72, y: 655, w: 230, labelKind: 'multiply' },
-      { xRatio: 0.42, y: 790, w: 390, labelKind: 'multiply' },
-      { xRatio: 0.68, y: 880, w: 250, labelKind: 'multiply' },
-    ],
-    gateSlots: [],
-    boosterSlots: [],
-    blockerSlots: [
-      { xRatio: 0.24, y: 520, angle: 0, h: 155 },
-      { xRatio: 0.55, y: 655, angle: 0, h: 150 },
-      { xRatio: 0.78, y: 790, angle: 0, h: 165 },
-    ],
-  },
-  {
-    id: 'side_switch',
-    pegZones: NO_PEG_ZONES,
-    gateZones: NO_GATE_ZONES,
-    rampAngles: { min: -24, max: 24 },
-    boosterPositions: FULL_BOOSTER_ZONE,
-    binDistribution: { outer: 1.1, shoulder: 1.05, center: 0.95, mysteryCenterFromChallenge: 8 },
-    riskRewardProfile: 'safe',
-    rampSlots: [
-      { xRatio: 0.18, y: 590, angle: -20, w: 170, label: 'switch' },
-      { xRatio: 0.82, y: 735, angle: 20, w: 170, label: 'switch' },
-    ],
-    platformSlots: [
-      { xRatio: 0.28, y: 370, w: 300, labelKind: 'multiply' },
-      { xRatio: 0.72, y: 505, w: 300, labelKind: 'multiply' },
-      { xRatio: 0.3, y: 650, w: 340, labelKind: 'multiply' },
-      { xRatio: 0.72, y: 790, w: 360, labelKind: 'multiply' },
-      { xRatio: 0.5, y: 880, w: 420, labelKind: 'multiply' },
-    ],
-    gateSlots: [],
-    boosterSlots: [],
-    blockerSlots: [
-      { xRatio: 0.5, y: 505, angle: 0, h: 150 },
-      { xRatio: 0.47, y: 650, angle: 0, h: 145 },
-      { xRatio: 0.52, y: 790, angle: 0, h: 150 },
-    ],
-  },
-  {
-    id: 'dense_multiplier_wall',
-    pegZones: NO_PEG_ZONES,
-    gateZones: NO_GATE_ZONES,
-    rampAngles: { min: -18, max: 18 },
-    boosterPositions: FULL_BOOSTER_ZONE,
-    binDistribution: { outer: 0.65, shoulder: 1.05, center: 1.55, mysteryCenterFromChallenge: 5 },
-    riskRewardProfile: 'highRisk',
-    rampSlots: [
-      { xRatio: 0.5, y: 455, angle: -14, w: 150, label: 'nudge' },
-      { xRatio: 0.5, y: 845, angle: 14, w: 150, label: 'nudge' },
-    ],
-    platformSlots: [
-      { xRatio: 0.29, y: 365, w: 260, labelKind: 'multiply' },
-      { xRatio: 0.72, y: 365, w: 260, labelKind: 'multiply' },
-      { xRatio: 0.5, y: 500, w: 500, labelKind: 'multiply' },
-      { xRatio: 0.27, y: 640, w: 260, labelKind: 'multiply' },
-      { xRatio: 0.73, y: 640, w: 260, labelKind: 'multiply' },
-      { xRatio: 0.5, y: 780, w: 480, labelKind: 'multiply' },
-      { xRatio: 0.5, y: 880, w: 300, labelKind: 'multiply' },
-    ],
-    gateSlots: [],
-    boosterSlots: [],
-    blockerSlots: [
-      { xRatio: 0.18, y: 500, angle: 0, h: 160 },
-      { xRatio: 0.38, y: 640, angle: 0, h: 165 },
-      { xRatio: 0.62, y: 640, angle: 0, h: 165 },
-      { xRatio: 0.82, y: 500, angle: 0, h: 160 },
-    ],
-  },
-  {
-    id: 'bonus_lane',
-    pegZones: NO_PEG_ZONES,
-    gateZones: NO_GATE_ZONES,
-    rampAngles: { min: -22, max: 22 },
-    boosterPositions: FULL_BOOSTER_ZONE,
-    binDistribution: { outer: 0.8, shoulder: 1.2, center: 1.35, mysteryCenterFromChallenge: 4 },
-    riskRewardProfile: 'swingy',
-    rampSlots: [
-      { xRatio: 0.18, y: 500, angle: -18, w: 160, label: 'lane' },
-      { xRatio: 0.82, y: 500, angle: 18, w: 160, label: 'lane' },
-      { xRatio: 0.5, y: 850, angle: 0, w: 180, label: 'bonus' },
-    ],
-    platformSlots: [
-      { xRatio: 0.5, y: 365, w: 360, labelKind: 'multiply' },
-      { xRatio: 0.27, y: 515, w: 220, labelKind: 'multiply' },
-      { xRatio: 0.73, y: 515, w: 220, labelKind: 'multiply' },
-      { xRatio: 0.5, y: 675, w: 520, labelKind: 'multiply' },
-      { xRatio: 0.32, y: 835, w: 260, labelKind: 'multiply' },
-      { xRatio: 0.72, y: 835, w: 240, labelKind: 'multiply' },
-    ],
-    gateSlots: [],
-    boosterSlots: [],
-    blockerSlots: [
-      { xRatio: 0.39, y: 515, angle: 0, h: 150 },
-      { xRatio: 0.61, y: 515, angle: 0, h: 150 },
-      { xRatio: 0.5, y: 835, angle: 0, h: 165 },
-    ],
-  },
-  {
-    id: 'booster_lane',
-    pegZones: NO_PEG_ZONES,
-    gateZones: NO_GATE_ZONES,
-    rampAngles: { min: -26, max: 26 },
-    boosterPositions: FULL_BOOSTER_ZONE,
-    binDistribution: { outer: 0.9, shoulder: 1.15, center: 1.2, mysteryCenterFromChallenge: 6 },
-    riskRewardProfile: 'swingy',
-    rampSlots: [
-      { xRatio: 0.24, y: 440, angle: -22, w: 170, label: 'boost in' },
-      { xRatio: 0.76, y: 760, angle: 22, w: 170, label: 'boost out' },
-    ],
-    platformSlots: [
-      { xRatio: 0.5, y: 360, w: 500, labelKind: 'multiply' },
-      { xRatio: 0.26, y: 505, w: 230, labelKind: 'multiply' },
-      { xRatio: 0.74, y: 505, w: 230, labelKind: 'multiply' },
-      { xRatio: 0.5, y: 660, w: 420, labelKind: 'multiply' },
-      { xRatio: 0.28, y: 815, w: 260, labelKind: 'multiply' },
-      { xRatio: 0.72, y: 880, w: 260, labelKind: 'multiply' },
-    ],
-    gateSlots: [],
-    boosterSlots: [
-      { xRatio: 0.5, y: 585, angle: 0 },
-      { xRatio: 0.5, y: 745, angle: 0 },
-    ],
-    blockerSlots: [
-      { xRatio: 0.38, y: 505, angle: 0, h: 150 },
-      { xRatio: 0.62, y: 505, angle: 0, h: 150 },
-      { xRatio: 0.5, y: 660, angle: 0, h: 170 },
-    ],
-  },
-  {
-    id: 'split_multiplier_row',
-    pegZones: NO_PEG_ZONES,
-    gateZones: NO_GATE_ZONES,
-    rampAngles: { min: -18, max: 18 },
-    boosterPositions: FULL_BOOSTER_ZONE,
-    binDistribution: { outer: 0.85, shoulder: 1.1, center: 1.3, mysteryCenterFromChallenge: 6 },
-    riskRewardProfile: 'balanced',
-    rampSlots: [
-      { xRatio: 0.18, y: 500, angle: -16, w: 155, label: 'split' },
-      { xRatio: 0.82, y: 760, angle: 16, w: 155, label: 'merge' },
-    ],
-    platformSlots: [{ xRatio: 0.5, y: 875, w: 420, labelKind: 'multiply' }],
-    gateSlots: [],
-    boosterSlots: [],
-    blockerSlots: [],
-    segmentRows: [
-      {
-        y: 390,
-        segments: [
-          { xStart: 56, width: 150, kind: 'multiply', valueRange: [3, 3] },
-          { xStart: 238, width: 280, kind: 'multiply', valueRange: [5, 8], colorRole: 'bonus' },
-          { xStart: 550, width: 140, kind: 'multiply', valueRange: [2, 2] },
-        ],
-      },
-      {
-        y: 645,
-        segments: [
-          { xStart: 82, width: 210, kind: 'multiply', valueRange: [2, 4], colorRole: 'multiply' },
-          { xStart: 330, width: 160, kind: 'multiply', valueRange: [2, 3] },
-          { xStart: 528, width: 170, kind: 'multiply', valueRange: [3, 5] },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'bonus_split_row',
-    pegZones: NO_PEG_ZONES,
-    gateZones: NO_GATE_ZONES,
-    rampAngles: { min: -22, max: 22 },
-    boosterPositions: FULL_BOOSTER_ZONE,
-    binDistribution: { outer: 0.75, shoulder: 1.2, center: 1.45, mysteryCenterFromChallenge: 4 },
-    riskRewardProfile: 'swingy',
-    rampSlots: [
-      { xRatio: 0.2, y: 540, angle: -18, w: 160, label: 'bonus' },
-      { xRatio: 0.8, y: 780, angle: 18, w: 160, label: 'bonus' },
-    ],
-    platformSlots: [{ xRatio: 0.5, y: 875, w: 390, labelKind: 'multiply' }],
-    gateSlots: [],
-    boosterSlots: [{ xRatio: 0.5, y: 720, angle: 0 }],
-    blockerSlots: [],
-    segmentRows: [
-      {
-        y: 400,
-        segments: [
-          { xStart: 58, width: 210, kind: 'multiply', valueRange: [2, 5], colorRole: 'multiply' },
-          { xStart: 305, width: 140, kind: 'multiply', valueRange: [2, 2] },
-          { xStart: 482, width: 210, kind: 'multiply', valueRange: [2, 5], colorRole: 'multiply' },
-        ],
-      },
-      {
-        y: 620,
-        segments: [
-          { xStart: 76, width: 175, kind: 'multiply', valueRange: [2, 3] },
-          { xStart: 288, width: 175, kind: 'mystery', valueRange: [0, 0], colorRole: 'mystery' },
-          { xStart: 500, width: 175, kind: 'multiply', valueRange: [2, 3] },
-        ],
-      },
-    ],
-  },
-];
+// ── Das EINE Board-Template ────────────────────────────────────────────────
+// Hier ist vollständig definiert, wie ein Board aussehen *kann*. Statt vieler
+// fest gebauter Templates beschreibt dieses Objekt den gesamten Möglichkeits-
+// raum als Bandbreiten/Optionen. Der Generator löst daraus seed-gesteuert ein
+// konkretes Layout auf (resolveBoard): zuerst Risiko-Profil + Struktur-Modus,
+// dann konkrete Reihen-, Plattform-, Rampen-, Blocker- und Booster-Positionen.
+// Gleiche (Seed, Welle, Difficulty) ⇒ exakt gleiches Board; andere Seeds ⇒
+// sichtbar andere Boards.
+interface FlexibleBoardConfig {
+  /** Vertikaler Bereich + Anzahl der Plattform-Reihen (Wand-Modus dichter). */
+  rows: {
+    top: number;
+    bottom: number;
+    countRange: [number, number];
+    wallCountRange: [number, number];
+  };
+  /** Plattform-Breiten je Rolle. */
+  platformWidth: {
+    wide: [number, number];
+    medium: [number, number];
+    split: [number, number];
+  };
+  /** Leit-Rampen: Anzahl, Winkel- und Breitenbereich. */
+  ramps: {
+    countRange: [number, number];
+    angleRange: [number, number];
+    widthRange: [number, number];
+  };
+  /** Beschleuniger-Felder: Wahrscheinlichkeit pro Board + Maximalzahl. */
+  boosters: { chance: number; maxCount: number };
+  /** Chance, dass eine Reihe als Segment-Reihe (nebeneinander liegende
+   *  Multiplikatoren) statt als einzelne Plattform erscheint. */
+  segments: { rowChance: number; strayChance: number };
+  /** Holz-Blocker-Höhenbereich. */
+  blockers: { heightRange: [number, number] };
+  /** Risiko-Profile und ihre Gewichtung in Abhängigkeit der Challenge. */
+  riskProfiles: readonly RiskRewardProfile[];
+  /** Struktur-Modi und ihre Gewichtung je Risiko-Profil. */
+  structureModes: readonly BoardStructureMode[];
+}
+
+const BOARD_TEMPLATE: FlexibleBoardConfig = {
+  rows: { top: 360, bottom: 890, countRange: [4, 6], wallCountRange: [6, 7] },
+  platformWidth: { wide: [360, 520], medium: [220, 340], split: [200, 280] },
+  ramps: { countRange: [1, 3], angleRange: [14, 26], widthRange: [150, 175] },
+  boosters: { chance: 0.45, maxCount: 2 },
+  segments: { rowChance: 0.5, strayChance: 0.12 },
+  blockers: { heightRange: [145, 170] },
+  riskProfiles: ['safe', 'balanced', 'swingy', 'highRisk'],
+  structureModes: ['cascade', 'split', 'wall', 'segments'],
+};
+
+// Bin-Verteilung (Außen-/Schulter-/Mitte-Gewichte + Mystery-Schwelle) folgt dem
+// gewürfelten Risiko-Profil: safe = flach/sicher, highRisk = extreme Mitte.
+const BIN_DISTRIBUTION_BY_RISK: Record<RiskRewardProfile, BinDistribution> = {
+  safe: { outer: 1.1, shoulder: 1.05, center: 0.95, mysteryCenterFromChallenge: 8 },
+  balanced: { outer: 0.95, shoulder: 1.05, center: 1.15, mysteryCenterFromChallenge: 7 },
+  swingy: { outer: 0.85, shoulder: 1.15, center: 1.3, mysteryCenterFromChallenge: 5 },
+  highRisk: { outer: 0.65, shoulder: 1.05, center: 1.55, mysteryCenterFromChallenge: 4 },
+};
+
+const STRUCTURE_MODE_WEIGHTS: Record<RiskRewardProfile, Record<BoardStructureMode, number>> = {
+  safe: { cascade: 5, split: 4, segments: 2, wall: 1 },
+  balanced: { cascade: 4, split: 4, segments: 3, wall: 2 },
+  swingy: { cascade: 2, split: 3, segments: 4, wall: 3 },
+  highRisk: { cascade: 1, split: 2, segments: 3, wall: 5 },
+};
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -345,6 +190,10 @@ function jitter(rng: Rng, amount: number): number {
 
 function scaledDifficulty(difficulty: number, wave: number): number {
   return clamp(Math.round(difficulty + wave * 0.35), 1, 12);
+}
+
+function rangeInt(rng: Rng, [min, max]: [number, number]): number {
+  return rng.intBetween(min, max);
 }
 
 function isInZone(x: number, y: number, zone: BoardZone): boolean {
@@ -383,43 +232,201 @@ function zoneAwarePoint(
 }
 
 export interface BoardGenerationOptions {
-  allowedTemplates?: readonly BoardTemplateId[];
   allowMystery?: boolean;
   allowBoosters?: boolean;
   budgetBonus?: number;
   idSuffix?: string;
 }
 
-export function pickTemplate(
+// ── Template-Auflösung (seed-gesteuert) ─────────────────────────────────────
+
+/** Risiko-Profil seed-gesteuert ziehen — bei niedriger Challenge ruhiger. */
+function pickRiskProfile(rng: Rng, challenge: number): RiskRewardProfile {
+  return rng.weightedPick([...BOARD_TEMPLATE.riskProfiles], (profile) =>
+    profile === 'safe'
+      ? clamp(8 - challenge, 1, 7)
+      : profile === 'balanced'
+        ? 6
+        : profile === 'swingy'
+          ? clamp(3 + challenge * 0.45, 3, 8)
+          : clamp(challenge - 1, 1, 9),
+  );
+}
+
+/** Struktur-Modus seed-gesteuert ziehen, gewichtet nach Risiko-Profil. */
+function pickStructureMode(rng: Rng, risk: RiskRewardProfile): BoardStructureMode {
+  return rng.weightedPick(
+    [...BOARD_TEMPLATE.structureModes],
+    (mode) => STRUCTURE_MODE_WEIGHTS[risk][mode],
+  );
+}
+
+/** Gleichmäßig verteilte Reihen-Y-Positionen für den gewählten Modus. */
+function buildRowYs(rng: Rng, mode: BoardStructureMode): number[] {
+  const { top, bottom, countRange, wallCountRange } = BOARD_TEMPLATE.rows;
+  const count = rangeInt(rng, mode === 'wall' ? wallCountRange : countRange);
+  const span = bottom - top;
+  const ys: number[] = [];
+  for (let i = 0; i < count; i++) {
+    ys.push(Math.round(top + (span * i) / Math.max(1, count - 1)));
+  }
+  return ys;
+}
+
+/** Eine Segment-Reihe (nebeneinander liegende Multiplikatoren) würfeln. */
+function buildSegmentRowDef(rng: Rng, y: number, allowMystery: boolean): SegmentRowDef {
+  const count = rng.intBetween(2, 3);
+  const edge = 56;
+  const gap = 28;
+  const usable = GAME_WIDTH - edge * 2 - gap * (count - 1);
+  const baseW = Math.floor(usable / count);
+  const segments: SegmentDef[] = [];
+  let x = edge;
+  for (let i = 0; i < count; i++) {
+    const isCenter = count === 3 && i === 1;
+    const width = clamp(baseW + jitter(rng, 26), 130, 300);
+    const useMystery = allowMystery && isCenter && rng.next() < 0.35;
+    const kind: SegmentKind = useMystery ? 'mystery' : 'multiply';
+    const valueRange: readonly [number, number] = useMystery ? [0, 0] : isCenter ? [4, 8] : [2, 5];
+    const colorRole: SegmentColorRole = useMystery ? 'mystery' : isCenter ? 'bonus' : 'multiply';
+    segments.push({ xStart: Math.round(x), width, kind, valueRange, colorRole });
+    x += width + gap;
+  }
+  return { y, segments };
+}
+
+/** Leit-Rampen seed-gesteuert platzieren (1–3, an wechselnden Seiten). */
+function buildRampSlots(rng: Rng): ResolvedBoard['rampSlots'] {
+  const count = rangeInt(rng, BOARD_TEMPLATE.ramps.countRange);
+  const [angleMin, angleMax] = BOARD_TEMPLATE.ramps.angleRange;
+  const slots: ResolvedBoard['rampSlots'] = [];
+  for (let i = 0; i < count; i++) {
+    const onLeft = i % 2 === 0;
+    const angleMag = rng.intBetween(angleMin, angleMax);
+    slots.push({
+      xRatio: onLeft ? 0.18 + rng.next() * 0.08 : 0.74 + rng.next() * 0.08,
+      y: clamp(440 + i * 150 + jitter(rng, 30), 400, 860),
+      angle: onLeft ? -angleMag : angleMag,
+      w: rangeInt(rng, BOARD_TEMPLATE.ramps.widthRange),
+      label: 'guide',
+    });
+  }
+  return slots;
+}
+
+/** Plattform-/Blocker-/Booster-/Segment-Slots für ein Reihen-Layout würfeln. */
+function buildBoardLayout(
   rng: Rng,
-  difficulty: number,
-  wave: number,
-  allowedTemplates?: readonly BoardTemplateId[],
-): BoardTemplateId {
-  const challenge = scaledDifficulty(difficulty, wave);
-  const templates = allowedTemplates?.length
-    ? BOARD_TEMPLATES.filter((template) => allowedTemplates.includes(template.id))
-    : BOARD_TEMPLATES;
-  return rng.weightedPick(templates, (template) => {
-    const waveCycleBonus = (wave + template.id.length) % BOARD_TEMPLATES.length === 0 ? 2 : 0;
-    const riskWeight =
-      template.riskRewardProfile === 'safe'
-        ? clamp(8 - challenge, 1, 7)
-        : template.riskRewardProfile === 'balanced'
-          ? 6
-          : template.riskRewardProfile === 'swingy'
-            ? clamp(3 + challenge * 0.45, 3, 8)
-            : clamp(challenge - 1, 1, 9);
+  mode: BoardStructureMode,
+  allowMystery: boolean,
+): Pick<ResolvedBoard, 'platformSlots' | 'blockerSlots' | 'boosterSlots' | 'segmentRows'> {
+  const platformSlots: ResolvedBoard['platformSlots'] = [];
+  const blockerSlots: ResolvedBoard['blockerSlots'] = [];
+  const boosterSlots: ResolvedBoard['boosterSlots'] = [];
+  const segmentRows: SegmentRowDef[] = [];
+  const rowYs = buildRowYs(rng, mode);
+  const { wide, medium, split } = BOARD_TEMPLATE.platformWidth;
+  const blockerHeight = BOARD_TEMPLATE.blockers.heightRange;
+  let boosterBudget =
+    rng.next() < BOARD_TEMPLATE.boosters.chance
+      ? rng.intBetween(1, BOARD_TEMPLATE.boosters.maxCount)
+      : 0;
 
-    return riskWeight + waveCycleBonus;
-  }).id;
+  rowYs.forEach((y, index) => {
+    // Bodennahe Fang-Plattform: immer eine breite, mittige Plattform unten.
+    if (index === rowYs.length - 1) {
+      platformSlots.push({ xRatio: 0.5, y, w: rangeInt(rng, wide), labelKind: 'multiply' });
+      return;
+    }
+
+    // Segment-Reihe? Im segments-Modus oft, sonst nur vereinzelt.
+    const segmentChance =
+      mode === 'segments' ? BOARD_TEMPLATE.segments.rowChance : BOARD_TEMPLATE.segments.strayChance;
+    if (rng.next() < segmentChance) {
+      segmentRows.push(buildSegmentRowDef(rng, y, allowMystery));
+      return;
+    }
+
+    if (mode === 'split' || (mode === 'wall' && index % 2 === 1)) {
+      // Zwei Plattformen links/rechts, Mitte frei für Blocker oder Booster.
+      // Hostet die Reihe einen Booster, werden die Plattformen schmaler und
+      // weiter an den Rand gerückt, damit der mittige Booster nicht überlappt.
+      const hostsBooster = boosterBudget > 0;
+      const w = hostsBooster
+        ? clamp(rangeInt(rng, split) - 60, 150, 200)
+        : rangeInt(rng, split);
+      const leftRatio = hostsBooster ? 0.2 + rng.next() * 0.03 : 0.27 + rng.next() * 0.04;
+      const rightRatio = hostsBooster ? 0.77 + rng.next() * 0.03 : 0.69 + rng.next() * 0.04;
+      platformSlots.push({ xRatio: leftRatio, y, w, labelKind: 'multiply' });
+      platformSlots.push({ xRatio: rightRatio, y, w, labelKind: 'multiply' });
+      if (hostsBooster) {
+        boosterSlots.push({ xRatio: 0.5, y, angle: 0 });
+        boosterBudget--;
+      } else {
+        blockerSlots.push({ xRatio: 0.5, y, angle: 0, h: rangeInt(rng, blockerHeight) });
+      }
+      return;
+    }
+
+    if (mode === 'wall') {
+      // Dichte, breite Plattform mit zwei seitlichen Blockern.
+      platformSlots.push({ xRatio: 0.5, y, w: rangeInt(rng, wide), labelKind: 'multiply' });
+      blockerSlots.push({ xRatio: 0.18, y, angle: 0, h: rangeInt(rng, blockerHeight) });
+      blockerSlots.push({ xRatio: 0.82, y, angle: 0, h: rangeInt(rng, blockerHeight) });
+      return;
+    }
+
+    // cascade (default): erste Reihe breit, danach versetzte Einzel-Plattformen
+    // mit einem Blocker auf der Gegenseite (zwischen den Reihen versetzt).
+    if (index === 0 || rng.next() < 0.25) {
+      platformSlots.push({ xRatio: 0.5, y, w: rangeInt(rng, wide), labelKind: 'multiply' });
+      return;
+    }
+    const onLeft = index % 2 === 1;
+    platformSlots.push({
+      xRatio: onLeft ? 0.3 + rng.next() * 0.06 : 0.64 + rng.next() * 0.06,
+      y,
+      w: rangeInt(rng, medium),
+      labelKind: 'multiply',
+    });
+    blockerSlots.push({
+      xRatio: onLeft ? 0.74 : 0.26,
+      y,
+      angle: 0,
+      h: rangeInt(rng, blockerHeight),
+    });
+  });
+
+  return { platformSlots, blockerSlots, boosterSlots, segmentRows };
 }
 
-function templateById(id: BoardTemplateId): BoardTemplate {
-  return BOARD_TEMPLATES.find((template) => template.id === id) ?? BOARD_TEMPLATES[0];
+/** Löst das flexible Template seed-gesteuert zu einem konkreten Board auf. */
+function resolveBoard(
+  rng: Rng,
+  challenge: number,
+  options: BoardGenerationOptions,
+): { template: ResolvedBoard; mode: BoardStructureMode } {
+  const risk = pickRiskProfile(rng, challenge);
+  const mode = pickStructureMode(rng, risk);
+  const layout = buildBoardLayout(rng, mode, options.allowMystery !== false);
+  const rampSlots = buildRampSlots(rng);
+  const angleMax = BOARD_TEMPLATE.ramps.angleRange[1];
+
+  return {
+    mode,
+    template: {
+      pegZones: NO_ZONES,
+      gateZones: NO_ZONES,
+      rampAngles: { min: -angleMax, max: angleMax },
+      binDistribution: BIN_DISTRIBUTION_BY_RISK[risk],
+      rampSlots,
+      gateSlots: [],
+      ...layout,
+    },
+  };
 }
 
-function buildPegs(rng: Rng, challenge: number, template: BoardTemplate): PegDef[] {
+function buildPegs(rng: Rng, challenge: number, template: ResolvedBoard): PegDef[] {
   if (template.pegZones.length === 0) return [];
 
   const pegs: PegDef[] = [];
@@ -681,7 +688,7 @@ function fixWallAngle(xRatio: number, angle: number): number {
 }
 
 function buildPatternObjects(
-  template: BoardTemplate,
+  template: ResolvedBoard,
   rng: Rng,
   challenge: number,
   budgetLimit: number,
@@ -832,7 +839,7 @@ function buildBins(
   challenge: number,
   rng: Rng,
   budgetLimit: number,
-  template: BoardTemplate,
+  template: ResolvedBoard,
 ): BinDef[] {
   const binW = GAME_WIDTH / BIN_COUNT;
   const baseJackpot = 8 + Math.floor(challenge / 2) + rng.intBetween(0, 2);
@@ -883,13 +890,12 @@ function buildGeneratedBoard(
     (seed ^ Math.imul(difficulty, 0x45d9f3b) ^ Math.imul(wave, 0x119de1f3)) >>> 0,
   );
   const challenge = scaledDifficulty(difficulty, wave);
-  const templateId = pickTemplate(rng, difficulty, wave, options.allowedTemplates);
-  const template = templateById(templateId);
+  const { template, mode } = resolveBoard(rng, challenge, options);
   const budget = buildBoardBudget(difficulty, wave, chapter) + (options.budgetBonus ?? 0);
   const patternObjects = buildPatternObjects(template, rng, challenge, budget, options);
 
   return {
-    id: `board_generated_${seed}_${difficulty}_${wave}_${chapter}_${template.id}${options.idSuffix ? `_${options.idSuffix}` : ''}`,
+    id: `board_generated_${seed}_${difficulty}_${wave}_${chapter}_${mode}${options.idSuffix ? `_${options.idSuffix}` : ''}`,
     width: GAME_WIDTH,
     height: BOARD_HEIGHT,
     gravity: 1,
