@@ -15,12 +15,14 @@ import type { BoardDef, BoardMotionDef } from '@/types/content';
 import {
   DROP_COLORS,
   gateColor,
-  renderBoardLabel,
   renderCatcher,
   renderCup,
   renderGate,
+  renderMultiplierBar,
   renderPeg,
   renderStageBackground,
+  renderWoodBeam,
+  renderWoodPost,
 } from '@/scenes/drop/DropBoardRenderer';
 import { floatingContribution, playGateFx, playStreamParticle } from '@/scenes/drop/DropFx';
 
@@ -200,11 +202,33 @@ export class DropScene extends Phaser.Scene {
 
     // Seitenwände (statisch). KEIN Boden — verfehlte Bälle fallen unten heraus
     // und werden vom sweep() als „verloren" verbucht, damit die Phase endet.
-    m.add.rectangle(-10, GAME_HEIGHT / 2, 20, GAME_HEIGHT, { isStatic: true, label: 'wall' });
-    m.add.rectangle(GAME_WIDTH + 10, GAME_HEIGHT / 2, 20, GAME_HEIGHT, {
+    const wallThickness = 28;
+    m.add.rectangle(wallThickness / 2, GAME_HEIGHT / 2, wallThickness, GAME_HEIGHT, {
       isStatic: true,
       label: 'wall',
     });
+    m.add.rectangle(GAME_WIDTH - wallThickness / 2, GAME_HEIGHT / 2, wallThickness, GAME_HEIGHT, {
+      isStatic: true,
+      label: 'wall',
+    });
+    renderWoodBeam(
+      this,
+      wallThickness / 2,
+      GAME_HEIGHT / 2,
+      GAME_HEIGHT + 28,
+      wallThickness,
+      Math.PI / 2,
+      12,
+    );
+    renderWoodBeam(
+      this,
+      GAME_WIDTH - wallThickness / 2,
+      GAME_HEIGHT / 2,
+      GAME_HEIGHT + 28,
+      wallThickness,
+      Math.PI / 2,
+      12,
+    );
 
     // Pegs als glänzende Pins.
     for (const peg of this.board.pegs) {
@@ -226,12 +250,7 @@ export class DropScene extends Phaser.Scene {
         restitution: this.board.defaultRestitution,
         label: 'ramp',
       });
-      this.add
-        .rectangle(ramp.x, ramp.y, ramp.w, ramp.h, ramp.color ?? DROP_COLORS.pinOuter, 0.88)
-        .setStrokeStyle(3, 0xffffff, 0.72)
-        .setRotation(angle)
-        .setDepth(6);
-      if (ramp.label) renderBoardLabel(this, ramp.x, ramp.y, ramp.label, '20px');
+      renderWoodBeam(this, ramp.x, ramp.y, ramp.w, Math.max(30, ramp.h), angle, 13);
     });
 
     this.board.blockers?.forEach((blocker) => {
@@ -242,11 +261,7 @@ export class DropScene extends Phaser.Scene {
         restitution: this.board.defaultRestitution * 0.85,
         label: 'blocker',
       });
-      const visual = this.add
-        .rectangle(blocker.x, blocker.y, blocker.w, blocker.h, blocker.color ?? 0xff6b6b, 0.9)
-        .setStrokeStyle(3, 0xffffff, 0.65)
-        .setRotation(angle)
-        .setDepth(6);
+      const visual = renderWoodPost(this, blocker.x, blocker.y, blocker.h, blocker.w, angle);
       this.trackBoardMotion(body, visual, blocker.x, blocker.y, blocker.motion);
     });
 
@@ -277,36 +292,15 @@ export class DropScene extends Phaser.Scene {
         angle,
         label: `platform:${i}`,
       });
-      const visual = this.add.container(platform.x, platform.y);
-      visual.add(
-        this.add
-          .rectangle(
-            platform.x + 7,
-            platform.y + 8,
-            platform.w + 18,
-            platform.h + 12,
-            DROP_COLORS.pinShadow,
-            0.42,
-          )
-          .setPosition(7, 8)
-          .setRotation(angle)
-          .setDepth(6),
+      const visual = renderMultiplierBar(
+        this,
+        platform.x,
+        platform.y,
+        platform.w,
+        platform.h,
+        platform.label,
+        platform.color ?? gateColor(platform.label),
       );
-      visual.add(
-        this.add
-          .rectangle(
-            0,
-            0,
-            platform.w,
-            platform.h,
-            platform.color ?? gateColor(platform.label),
-            0.94,
-          )
-          .setStrokeStyle(5, 0xffffff, 0.86)
-          .setRotation(angle)
-          .setDepth(7),
-      );
-      visual.add(renderBoardLabel(this, 0, 0, platform.label, '28px'));
       this.trackBoardMotion(body, visual, platform.x, platform.y, platform.motion);
     });
 
@@ -318,15 +312,15 @@ export class DropScene extends Phaser.Scene {
         angle,
         label: `booster:${i}`,
       });
-      const visual = this.add.container(booster.x, booster.y);
-      visual.add(
-        this.add
-          .rectangle(0, 0, booster.w, booster.h, booster.color ?? 0xff4fd8, 0.9)
-          .setStrokeStyle(5, 0xffffff, 0.86)
-          .setRotation(angle)
-          .setDepth(7),
+      const visual = renderMultiplierBar(
+        this,
+        booster.x,
+        booster.y,
+        booster.w,
+        booster.h,
+        booster.label,
+        booster.color ?? gateColor(booster.label),
       );
-      visual.add(renderBoardLabel(this, 0, 0, booster.label, '20px'));
       this.trackBoardMotion(body, visual, booster.x, booster.y, booster.motion);
     });
 
@@ -393,27 +387,19 @@ export class DropScene extends Phaser.Scene {
   }
 
   // Solide Rampe aus zwei Endpunkten (Länge/Winkel berechnet) + Holz-Optik.
-  private addRamp(x1: number, y1: number, x2: number, y2: number, color: number): void {
+  private addRamp(x1: number, y1: number, x2: number, y2: number): void {
     const cx = (x1 + x2) / 2;
     const cy = (y1 + y2) / 2;
     const length = Math.hypot(x2 - x1, y2 - y1);
     const angle = Math.atan2(y2 - y1, x2 - x1);
-    this.matter.add.rectangle(cx, cy, length, 20, {
+    this.matter.add.rectangle(cx, cy, length, 42, {
       isStatic: true,
       angle,
       restitution: 0.18,
       friction: 0,
       label: 'wall',
     });
-    this.add
-      .rectangle(cx + 3, cy + 5, length, 26, DROP_COLORS.pinShadow, 0.34)
-      .setRotation(angle)
-      .setDepth(6);
-    this.add
-      .rectangle(cx, cy, length, 20, color, 0.96)
-      .setStrokeStyle(3, 0xffffff, 0.5)
-      .setRotation(angle)
-      .setDepth(8);
+    renderWoodBeam(this, cx, cy, length, 42, angle, 14);
   }
 
   // Fester Fang-Becher unten + TRICHTER: zwei Rampen leiten alle Bälle in den
@@ -426,8 +412,8 @@ export class DropScene extends Phaser.Scene {
     const gapHalf = this.catcherWidth / 2 - 8;
     const innerY = CATCHER_Y - 34;
     const outerY = CATCHER_Y - 168;
-    this.addRamp(8, outerY, CENTER_X - gapHalf, innerY, DROP_COLORS.funnelWood);
-    this.addRamp(GAME_WIDTH - 8, outerY, CENTER_X + gapHalf, innerY, DROP_COLORS.funnelWood);
+    this.addRamp(14, outerY, CENTER_X - gapHalf, innerY);
+    this.addRamp(GAME_WIDTH - 14, outerY, CENTER_X + gapHalf, innerY);
 
     const catcherVisuals = renderCatcher(this, CENTER_X, CATCHER_Y, this.catcherWidth);
     this.catcher = catcherVisuals.cup;
