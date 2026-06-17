@@ -56,13 +56,11 @@ export const MAX_MULTIPLIER_BY_DIFFICULTY: ReadonlyArray<{
 ];
 
 export type BoardTemplateId =
-  | 'classic'
-  | 'snake'
-  | 'split_choice'
-  | 'booster_tunnel'
-  | 'bonus_trap'
-  | 'rain'
-  | 'risk_wall';
+  | 'bar_cascade'
+  | 'side_switch'
+  | 'dense_multiplier_wall'
+  | 'bonus_lane'
+  | 'booster_lane';
 
 type RiskRewardProfile = 'safe' | 'balanced' | 'swingy' | 'highRisk';
 
@@ -96,215 +94,153 @@ interface BoardTemplate {
   blockerSlots: Array<{ xRatio: number; y: number; angle: number; h: number }>;
 }
 
+const NO_PEG_ZONES: BoardZone[] = [];
+const NO_GATE_ZONES: BoardZone[] = [];
+const FULL_BOOSTER_ZONE: BoardZone[] = [{ xMinRatio: 0.12, xMaxRatio: 0.88, yMin: 360, yMax: 880 }];
+
 const BOARD_TEMPLATES: BoardTemplate[] = [
   {
-    id: 'classic',
-    pegZones: [
-      { xMinRatio: 0.08, xMaxRatio: 0.92, yMin: SAFE_TOP_Y + 20, yMax: SAFE_BOTTOM_Y - 150 },
-    ],
-    gateZones: [{ xMinRatio: 0.18, xMaxRatio: 0.82, yMin: 560, yMax: 760 }],
-    rampAngles: { min: -26, max: 26 },
-    boosterPositions: [{ xMinRatio: 0.42, xMaxRatio: 0.58, yMin: 610, yMax: 760 }],
-    binDistribution: { outer: 1, shoulder: 1, center: 1, mysteryCenterFromChallenge: 7 },
+    id: 'bar_cascade',
+    pegZones: NO_PEG_ZONES,
+    gateZones: NO_GATE_ZONES,
+    rampAngles: { min: -20, max: 20 },
+    boosterPositions: FULL_BOOSTER_ZONE,
+    binDistribution: { outer: 0.95, shoulder: 1.05, center: 1.15, mysteryCenterFromChallenge: 7 },
     riskRewardProfile: 'balanced',
     rampSlots: [
-      { xRatio: 0.2, y: 455, angle: -22, w: 170, label: '↘' },
-      { xRatio: 0.8, y: 455, angle: 22, w: 170, label: '↙' },
-      { xRatio: 0.28, y: 820, angle: 18, w: 150, label: '↙' },
-      { xRatio: 0.72, y: 820, angle: -18, w: 150, label: '↘' },
+      { xRatio: 0.18, y: 425, angle: -16, w: 150, label: 'guide' },
+      { xRatio: 0.82, y: 795, angle: 16, w: 150, label: 'guide' },
     ],
     platformSlots: [
-      { xRatio: 0.5, y: 545, w: 230, labelKind: 'multiply' },
-      { xRatio: 0.35, y: 735, w: 190, labelKind: 'add' },
-      { xRatio: 0.65, y: 920, w: 190, labelKind: 'multiply' },
+      { xRatio: 0.5, y: 365, w: 520, labelKind: 'multiply' },
+      { xRatio: 0.34, y: 520, w: 310, labelKind: 'multiply' },
+      { xRatio: 0.72, y: 655, w: 230, labelKind: 'add' },
+      { xRatio: 0.42, y: 790, w: 390, labelKind: 'multiply' },
+      { xRatio: 0.68, y: 880, w: 250, labelKind: 'multiply' },
     ],
-    gateSlots: [
-      { xRatio: 0.3, y: 660, kind: 'multiply' },
-      { xRatio: 0.7, y: 660, kind: 'add' },
-    ],
-    boosterSlots: [{ xRatio: 0.5, y: 690 }],
-    blockerSlots: [{ xRatio: 0.5, y: 1005, angle: 0, h: 95 }],
-  },
-  {
-    id: 'snake',
-    pegZones: [
-      { xMinRatio: 0.12, xMaxRatio: 0.88, yMin: SAFE_TOP_Y + 30, yMax: SAFE_BOTTOM_Y - 120 },
-    ],
-    gateZones: [{ xMinRatio: 0.16, xMaxRatio: 0.84, yMin: 610, yMax: 790 }],
-    rampAngles: { min: -30, max: 28 },
-    boosterPositions: [{ xMinRatio: 0.42, xMaxRatio: 0.58, yMin: 740, yMax: 860 }],
-    binDistribution: { outer: 0.9, shoulder: 1.05, center: 1.15, mysteryCenterFromChallenge: 6 },
-    riskRewardProfile: 'swingy',
-    rampSlots: [
-      { xRatio: 0.24, y: 430, angle: -26, w: 165, label: '↘' },
-      { xRatio: 0.74, y: 590, angle: 24, w: 160, label: '↙' },
-      { xRatio: 0.3, y: 780, angle: 22, w: 165, label: '↙' },
-      { xRatio: 0.68, y: 910, angle: -20, w: 145, label: '↘' },
-    ],
-    platformSlots: [
-      { xRatio: 0.62, y: 510, w: 170, labelKind: 'add' },
-      { xRatio: 0.38, y: 700, w: 175, labelKind: 'multiply' },
-      { xRatio: 0.55, y: 885, w: 160, labelKind: 'add' },
-    ],
-    gateSlots: [
-      { xRatio: 0.24, y: 645, kind: 'add' },
-      { xRatio: 0.76, y: 745, kind: 'multiply' },
-    ],
-    boosterSlots: [{ xRatio: 0.5, y: 805, angle: -8 }],
+    gateSlots: [],
+    boosterSlots: [],
     blockerSlots: [
-      { xRatio: 0.42, y: 1000, angle: -10, h: 105 },
-      { xRatio: 0.58, y: 1000, angle: 10, h: 105 },
+      { xRatio: 0.24, y: 520, angle: 0, h: 155 },
+      { xRatio: 0.55, y: 655, angle: 0, h: 150 },
+      { xRatio: 0.78, y: 790, angle: 0, h: 165 },
     ],
   },
   {
-    id: 'split_choice',
-    pegZones: [
-      { xMinRatio: 0.07, xMaxRatio: 0.43, yMin: SAFE_TOP_Y + 25, yMax: SAFE_BOTTOM_Y - 130 },
-      { xMinRatio: 0.57, xMaxRatio: 0.93, yMin: SAFE_TOP_Y + 25, yMax: SAFE_BOTTOM_Y - 130 },
-    ],
-    gateZones: [{ xMinRatio: 0.2, xMaxRatio: 0.8, yMin: 640, yMax: 760 }],
-    rampAngles: { min: -32, max: 32 },
-    boosterPositions: [{ xMinRatio: 0.44, xMaxRatio: 0.56, yMin: 680, yMax: 790 }],
-    binDistribution: { outer: 0.75, shoulder: 1.1, center: 1.35, mysteryCenterFromChallenge: 5 },
-    riskRewardProfile: 'highRisk',
-    rampSlots: [
-      { xRatio: 0.18, y: 420, angle: -28, w: 175, label: '↘' },
-      { xRatio: 0.82, y: 420, angle: 28, w: 175, label: '↙' },
-      { xRatio: 0.5, y: 930, angle: 14, w: 150, label: 'tilt' },
-    ],
-    platformSlots: [
-      { xRatio: 0.5, y: 525, w: 190, labelKind: 'multiply' },
-      { xRatio: 0.28, y: 710, w: 155, labelKind: 'add' },
-      { xRatio: 0.72, y: 875, w: 155, labelKind: 'multiply' },
-    ],
-    gateSlots: [
-      { xRatio: 0.28, y: 700, kind: 'multiply' },
-      { xRatio: 0.72, y: 700, kind: 'add' },
-    ],
-    boosterSlots: [{ xRatio: 0.5, y: 735 }],
-    blockerSlots: [
-      { xRatio: 0.45, y: 995, angle: -8, h: 105 },
-      { xRatio: 0.55, y: 995, angle: 8, h: 105 },
-    ],
-  },
-  {
-    id: 'booster_tunnel',
-    pegZones: [
-      { xMinRatio: 0.12, xMaxRatio: 0.88, yMin: SAFE_TOP_Y + 50, yMax: SAFE_BOTTOM_Y - 140 },
-    ],
-    gateZones: [{ xMinRatio: 0.24, xMaxRatio: 0.76, yMin: 520, yMax: 650 }],
-    rampAngles: { min: -28, max: 28 },
-    boosterPositions: [{ xMinRatio: 0.26, xMaxRatio: 0.74, yMin: 780, yMax: 875 }],
-    binDistribution: { outer: 0.8, shoulder: 1.15, center: 1.2, mysteryCenterFromChallenge: 6 },
-    riskRewardProfile: 'swingy',
-    rampSlots: [
-      { xRatio: 0.18, y: 500, angle: -24, w: 155, label: '↘' },
-      { xRatio: 0.82, y: 500, angle: 24, w: 155, label: '↙' },
-      { xRatio: 0.22, y: 860, angle: 20, w: 145, label: '↙' },
-      { xRatio: 0.78, y: 860, angle: -20, w: 145, label: '↘' },
-    ],
-    platformSlots: [
-      { xRatio: 0.22, y: 630, w: 145, labelKind: 'add' },
-      { xRatio: 0.5, y: 760, w: 170, labelKind: 'multiply' },
-      { xRatio: 0.78, y: 630, w: 145, labelKind: 'add' },
-    ],
-    gateSlots: [
-      { xRatio: 0.35, y: 575, kind: 'multiply' },
-      { xRatio: 0.65, y: 575, kind: 'multiply' },
-    ],
-    boosterSlots: [
-      { xRatio: 0.32, y: 830, angle: 8 },
-      { xRatio: 0.68, y: 830, angle: -8 },
-    ],
-    blockerSlots: [{ xRatio: 0.5, y: 1005, angle: 0, h: 100 }],
-  },
-
-  {
-    id: 'bonus_trap',
-    pegZones: [
-      { xMinRatio: 0.1, xMaxRatio: 0.9, yMin: SAFE_TOP_Y + 35, yMax: SAFE_BOTTOM_Y - 115 },
-    ],
-    gateZones: [{ xMinRatio: 0.32, xMaxRatio: 0.68, yMin: 600, yMax: 800 }],
+    id: 'side_switch',
+    pegZones: NO_PEG_ZONES,
+    gateZones: NO_GATE_ZONES,
     rampAngles: { min: -24, max: 24 },
-    boosterPositions: [{ xMinRatio: 0.18, xMaxRatio: 0.82, yMin: 660, yMax: 900 }],
-    binDistribution: { outer: 0.65, shoulder: 1.25, center: 1.45, mysteryCenterFromChallenge: 4 },
-    riskRewardProfile: 'highRisk',
-    rampSlots: [
-      { xRatio: 0.16, y: 520, angle: -18, w: 145, label: 'trap' },
-      { xRatio: 0.84, y: 520, angle: 18, w: 145, label: 'trap' },
-      { xRatio: 0.5, y: 885, angle: 0, w: 135, label: 'bonus' },
-    ],
-    platformSlots: [
-      { xRatio: 0.5, y: 615, w: 150, labelKind: 'multiply' },
-      { xRatio: 0.24, y: 785, w: 155, labelKind: 'add' },
-      { xRatio: 0.76, y: 785, w: 155, labelKind: 'add' },
-    ],
-    gateSlots: [
-      { xRatio: 0.5, y: 690, kind: 'multiply' },
-      { xRatio: 0.5, y: 810, kind: 'add' },
-    ],
-    boosterSlots: [{ xRatio: 0.5, y: 760, angle: 0 }],
-    blockerSlots: [
-      { xRatio: 0.38, y: 985, angle: -14, h: 115 },
-      { xRatio: 0.62, y: 985, angle: 14, h: 115 },
-    ],
-  },
-  {
-    id: 'rain',
-    pegZones: [
-      { xMinRatio: 0.06, xMaxRatio: 0.94, yMin: SAFE_TOP_Y + 15, yMax: SAFE_BOTTOM_Y - 170 },
-    ],
-    gateZones: [{ xMinRatio: 0.18, xMaxRatio: 0.82, yMin: 500, yMax: 820 }],
-    rampAngles: { min: -16, max: 16 },
-    boosterPositions: [{ xMinRatio: 0.35, xMaxRatio: 0.65, yMin: 820, yMax: 940 }],
-    binDistribution: { outer: 1.15, shoulder: 1, center: 0.9, mysteryCenterFromChallenge: 8 },
+    boosterPositions: FULL_BOOSTER_ZONE,
+    binDistribution: { outer: 1.1, shoulder: 1.05, center: 0.95, mysteryCenterFromChallenge: 8 },
     riskRewardProfile: 'safe',
     rampSlots: [
-      { xRatio: 0.25, y: 585, angle: -12, w: 170, label: 'drip' },
-      { xRatio: 0.75, y: 585, angle: 12, w: 170, label: 'drip' },
-      { xRatio: 0.5, y: 840, angle: 8, w: 190, label: 'flow' },
+      { xRatio: 0.18, y: 590, angle: -20, w: 170, label: 'switch' },
+      { xRatio: 0.82, y: 735, angle: 20, w: 170, label: 'switch' },
     ],
     platformSlots: [
-      { xRatio: 0.32, y: 500, w: 175, labelKind: 'add' },
-      { xRatio: 0.68, y: 735, w: 175, labelKind: 'add' },
-      { xRatio: 0.5, y: 925, w: 210, labelKind: 'multiply' },
+      { xRatio: 0.28, y: 370, w: 300, labelKind: 'multiply' },
+      { xRatio: 0.72, y: 505, w: 300, labelKind: 'multiply' },
+      { xRatio: 0.3, y: 650, w: 340, labelKind: 'add' },
+      { xRatio: 0.72, y: 790, w: 360, labelKind: 'multiply' },
+      { xRatio: 0.5, y: 880, w: 420, labelKind: 'multiply' },
     ],
-    gateSlots: [
-      { xRatio: 0.32, y: 650, kind: 'add' },
-      { xRatio: 0.68, y: 650, kind: 'add' },
+    gateSlots: [],
+    boosterSlots: [],
+    blockerSlots: [
+      { xRatio: 0.5, y: 505, angle: 0, h: 150 },
+      { xRatio: 0.47, y: 650, angle: 0, h: 145 },
+      { xRatio: 0.52, y: 790, angle: 0, h: 150 },
     ],
-    boosterSlots: [{ xRatio: 0.5, y: 880, angle: 0 }],
-    blockerSlots: [{ xRatio: 0.5, y: 1010, angle: 0, h: 80 }],
   },
   {
-    id: 'risk_wall',
-    pegZones: [
-      { xMinRatio: 0.14, xMaxRatio: 0.86, yMin: SAFE_TOP_Y + 40, yMax: SAFE_BOTTOM_Y - 125 },
-    ],
-    gateZones: [{ xMinRatio: 0.22, xMaxRatio: 0.78, yMin: 580, yMax: 890 }],
-    rampAngles: { min: -34, max: 34 },
-    boosterPositions: [{ xMinRatio: 0.2, xMaxRatio: 0.8, yMin: 700, yMax: 900 }],
-    binDistribution: { outer: 0.5, shoulder: 1, center: 1.6, mysteryCenterFromChallenge: 4 },
+    id: 'dense_multiplier_wall',
+    pegZones: NO_PEG_ZONES,
+    gateZones: NO_GATE_ZONES,
+    rampAngles: { min: -18, max: 18 },
+    boosterPositions: FULL_BOOSTER_ZONE,
+    binDistribution: { outer: 0.65, shoulder: 1.05, center: 1.55, mysteryCenterFromChallenge: 5 },
     riskRewardProfile: 'highRisk',
     rampSlots: [
-      { xRatio: 0.22, y: 470, angle: -30, w: 160, label: '↘' },
-      { xRatio: 0.78, y: 470, angle: 30, w: 160, label: '↙' },
-      { xRatio: 0.5, y: 805, angle: -22, w: 155, label: 'wall' },
+      { xRatio: 0.5, y: 455, angle: -14, w: 150, label: 'nudge' },
+      { xRatio: 0.5, y: 845, angle: 14, w: 150, label: 'nudge' },
     ],
     platformSlots: [
-      { xRatio: 0.5, y: 585, w: 155, labelKind: 'multiply' },
-      { xRatio: 0.3, y: 875, w: 150, labelKind: 'multiply' },
-      { xRatio: 0.7, y: 875, w: 150, labelKind: 'add' },
+      { xRatio: 0.29, y: 365, w: 260, labelKind: 'multiply' },
+      { xRatio: 0.72, y: 365, w: 260, labelKind: 'multiply' },
+      { xRatio: 0.5, y: 500, w: 500, labelKind: 'multiply' },
+      { xRatio: 0.27, y: 640, w: 260, labelKind: 'multiply' },
+      { xRatio: 0.73, y: 640, w: 260, labelKind: 'multiply' },
+      { xRatio: 0.5, y: 780, w: 480, labelKind: 'multiply' },
+      { xRatio: 0.5, y: 880, w: 300, labelKind: 'add' },
     ],
-    gateSlots: [
-      { xRatio: 0.4, y: 720, kind: 'multiply' },
-      { xRatio: 0.6, y: 720, kind: 'multiply' },
-    ],
-    boosterSlots: [{ xRatio: 0.5, y: 820, angle: -10 }],
+    gateSlots: [],
+    boosterSlots: [],
     blockerSlots: [
-      { xRatio: 0.43, y: 950, angle: -4, h: 125 },
-      { xRatio: 0.5, y: 980, angle: 0, h: 130 },
-      { xRatio: 0.57, y: 950, angle: 4, h: 125 },
+      { xRatio: 0.18, y: 500, angle: 0, h: 160 },
+      { xRatio: 0.38, y: 640, angle: 0, h: 165 },
+      { xRatio: 0.62, y: 640, angle: 0, h: 165 },
+      { xRatio: 0.82, y: 500, angle: 0, h: 160 },
+    ],
+  },
+  {
+    id: 'bonus_lane',
+    pegZones: NO_PEG_ZONES,
+    gateZones: NO_GATE_ZONES,
+    rampAngles: { min: -22, max: 22 },
+    boosterPositions: FULL_BOOSTER_ZONE,
+    binDistribution: { outer: 0.8, shoulder: 1.2, center: 1.35, mysteryCenterFromChallenge: 4 },
+    riskRewardProfile: 'swingy',
+    rampSlots: [
+      { xRatio: 0.18, y: 500, angle: -18, w: 160, label: 'lane' },
+      { xRatio: 0.82, y: 500, angle: 18, w: 160, label: 'lane' },
+      { xRatio: 0.5, y: 850, angle: 0, w: 180, label: 'bonus' },
+    ],
+    platformSlots: [
+      { xRatio: 0.5, y: 365, w: 360, labelKind: 'multiply' },
+      { xRatio: 0.27, y: 515, w: 220, labelKind: 'add' },
+      { xRatio: 0.73, y: 515, w: 220, labelKind: 'add' },
+      { xRatio: 0.5, y: 675, w: 520, labelKind: 'multiply' },
+      { xRatio: 0.32, y: 835, w: 260, labelKind: 'multiply' },
+      { xRatio: 0.72, y: 835, w: 240, labelKind: 'add' },
+    ],
+    gateSlots: [],
+    boosterSlots: [],
+    blockerSlots: [
+      { xRatio: 0.39, y: 515, angle: 0, h: 150 },
+      { xRatio: 0.61, y: 515, angle: 0, h: 150 },
+      { xRatio: 0.5, y: 835, angle: 0, h: 165 },
+    ],
+  },
+  {
+    id: 'booster_lane',
+    pegZones: NO_PEG_ZONES,
+    gateZones: NO_GATE_ZONES,
+    rampAngles: { min: -26, max: 26 },
+    boosterPositions: FULL_BOOSTER_ZONE,
+    binDistribution: { outer: 0.9, shoulder: 1.15, center: 1.2, mysteryCenterFromChallenge: 6 },
+    riskRewardProfile: 'swingy',
+    rampSlots: [
+      { xRatio: 0.24, y: 440, angle: -22, w: 170, label: 'boost in' },
+      { xRatio: 0.76, y: 760, angle: 22, w: 170, label: 'boost out' },
+    ],
+    platformSlots: [
+      { xRatio: 0.5, y: 360, w: 500, labelKind: 'multiply' },
+      { xRatio: 0.26, y: 505, w: 230, labelKind: 'add' },
+      { xRatio: 0.74, y: 505, w: 230, labelKind: 'multiply' },
+      { xRatio: 0.5, y: 660, w: 420, labelKind: 'multiply' },
+      { xRatio: 0.28, y: 815, w: 260, labelKind: 'multiply' },
+      { xRatio: 0.72, y: 880, w: 260, labelKind: 'add' },
+    ],
+    gateSlots: [],
+    boosterSlots: [
+      { xRatio: 0.5, y: 585, angle: 0 },
+      { xRatio: 0.5, y: 745, angle: 0 },
+    ],
+    blockerSlots: [
+      { xRatio: 0.38, y: 505, angle: 0, h: 150 },
+      { xRatio: 0.62, y: 505, angle: 0, h: 150 },
+      { xRatio: 0.5, y: 660, angle: 0, h: 170 },
     ],
   },
 ];
@@ -394,6 +330,8 @@ function templateById(id: BoardTemplateId): BoardTemplate {
 }
 
 function buildPegs(rng: Rng, challenge: number, template: BoardTemplate): PegDef[] {
+  if (template.pegZones.length === 0) return [];
+
   const pegs: PegDef[] = [];
   const rows = clamp(5 + Math.floor(challenge / 3), 5, 8);
   const rowGap = clamp(92 - challenge * 3, 66, 92);
@@ -550,7 +488,7 @@ function buildPatternObjects(
     h: 16,
     angle: clamp(slot.angle + jitter(rng, 4), template.rampAngles.min, template.rampAngles.max),
     label: slot.label,
-    color: 0xd7f3ff,
+    color: 0x9b5f2a,
   }));
 
   const boosters: BoardBoosterDef[] = [];
@@ -574,7 +512,7 @@ function buildPatternObjects(
     h: slot.h,
     angle: slot.angle,
     label: 'risk',
-    color: 0xff6b6b,
+    color: 0x7a4a24,
   }));
 
   return { gates, platforms, ramps, boosters, blockers };
