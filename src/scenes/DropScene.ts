@@ -43,13 +43,12 @@ type RevealableBoardElement = {
   visual: Phaser.GameObjects.Container;
   revealed: boolean;
 };
-const BALL_RADIUS = 7;
+const BALL_RADIUS = 7.7;
 const DRIP_INTERVAL_MS = 22;
 const BALLS_PER_DRIP = 2; // mehrere Bälle pro Tick → dichter Strom (Masse)
 const STRONG_GATE_THRESHOLD = 3;
 const SPIN_TIMEOUT_MS = 10000; // harte Timeout-Sicherung: Phase endet garantiert
 const NO_CATCH_END_MS = 800; // Becher füllt sich seit 0,8s nicht mehr → Phase beenden
-const VACUUM_AFTER_MS = 2500; // nach dieser freien Kaskade alle Reste in den Becher saugen
 const STUCK_MS = 1300; // Ball bewegt sich ~1,3s kaum → festhängend, entfernen
 const STUCK_DIST = 6; // px-Schwelle „hat sich bewegt"
 const CUP_Y = 180; // beweglicher Ausschütt-Becher (oben)
@@ -75,7 +74,6 @@ export class DropScene extends Phaser.Scene {
   private lastFxTotal = 0; // gedrosseltes Catch-FX: zeigt „+N" pro Burst
   private lastFxAt = 0;
   private lastCatchAt = 0; // letzter Becher-Treffer — Phase endet, wenn er aufhört
-  private allSpawnedAt = 0; // Zeitpunkt, ab dem alle Bälle ausgeschüttet sind
   private ammo = 0;
   private spawned = 0;
   private releasing = false;
@@ -148,7 +146,6 @@ export class DropScene extends Phaser.Scene {
     this.lastFxTotal = 0;
     this.lastFxAt = 0;
     this.lastCatchAt = 0;
-    this.allSpawnedAt = 0;
     this.active.clear();
     this.fillBalls.length = 0;
     this.movingBoardElements.length = 0;
@@ -157,6 +154,21 @@ export class DropScene extends Phaser.Scene {
   // Phaser-Frame-Loop: Live-Ballzähler oben aktualisieren (Bälle im Spiel).
   update(): void {
     this.updateBoardMotion();
+    
+    // Wischspur / Motion Blur für alle Bälle
+    for (const go of this.active) {
+      if (go.body) {
+        const body = go.body as MatterJS.BodyType;
+        const vx = body.velocity.x;
+        const vy = body.velocity.y;
+        const speed = Math.sqrt(vx * vx + vy * vy);
+        // Ziehe den Ball anhand seiner Geschwindigkeit in die Länge
+        go.scaleY = 1 + speed * 0.04;
+        go.scaleX = Math.max(0.6, 1 - speed * 0.015);
+        go.rotation = Math.atan2(vy, vx) - Math.PI / 2;
+      }
+    }
+
     if (this.finished || !this.releasing) return;
     this.topBar.refresh();
   }
@@ -569,7 +581,6 @@ export class DropScene extends Phaser.Scene {
     for (let i = 0; i < BALLS_PER_DRIP; i += 1) {
       if (this.active.size >= this.board.maxConcurrentBalls) return; // Performance-Cap
       if (this.spawned >= this.ammo) {
-        if (!this.allSpawned) this.allSpawnedAt = this.time.now;
         this.allSpawned = true;
         return;
       }
@@ -596,7 +607,7 @@ export class DropScene extends Phaser.Scene {
   private spawnBallFromCup(): void {
     const x = this.cup.x + Phaser.Math.Between(-22, 22);
     const y = CUP_Y + Phaser.Math.Between(18, 34);
-    const ball = this.add.circle(x, y, BALL_RADIUS, 0xffffff);
+    const ball = this.add.circle(x, y, BALL_RADIUS, 0xffffff).setStrokeStyle(1.5, 0x000000, 0.4);
     this.initBall(ball, x, y);
     this.matter.add.gameObject(ball, {
       shape: { type: 'circle', radius: BALL_RADIUS },
@@ -778,7 +789,7 @@ export class DropScene extends Phaser.Scene {
         GAME_WIDTH - BALL_RADIUS,
       );
       const y = sourceBall.y - Phaser.Math.Between(4, 12);
-      const ball = this.add.circle(x, y, BALL_RADIUS, 0xffffff).setDepth(sourceBall.depth);
+      const ball = this.add.circle(x, y, BALL_RADIUS, 0xffffff).setStrokeStyle(1.5, 0x000000, 0.4).setDepth(sourceBall.depth);
       this.initBall(ball, x, y, inheritedGates);
       this.matter.add.gameObject(ball, {
         shape: { type: 'circle', radius: BALL_RADIUS },
@@ -911,17 +922,7 @@ export class DropScene extends Phaser.Scene {
   private sweep(): void {
     if (this.finished) return;
     const now = this.time.now;
-    // Sog in den Becher: greift, sobald nur noch wenige Nachzügler übrig sind ODER
-    // die freie Kaskade lang genug lief (VACUUM_AFTER_MS). So bleibt der Drop kurz,
-    // ohne den Masse-Effekt der ersten Sekunden zu verlieren.
-    const vacuum =
-      this.allSpawned &&
-      (this.active.size <= 8 || this.time.now - this.allSpawnedAt > VACUUM_AFTER_MS);
-    if (vacuum) {
-      for (const go of this.active) {
-        this.setBallVelocity(go, (CENTER_X - go.x) * 0.06, 16);
-      }
-    }
+    
     // Becher füllt sich nicht mehr: Ist alles ausgeschüttet, hat der Becher schon
     // Bälle (≥1 Treffer) und kam seit NO_CATCH_END_MS keiner mehr dazu → Phase
     // beenden. Genau das Gefühl „alle Bälle sind drin, jetzt weiter".

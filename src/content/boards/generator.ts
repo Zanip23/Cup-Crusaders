@@ -648,6 +648,12 @@ function removeBlockersInsideMultiplierBars(
   );
 }
 
+function fixWallAngle(xRatio: number, angle: number): number {
+  if (xRatio < 0.5 && angle < 0) return Math.abs(angle);
+  if (xRatio > 0.5 && angle > 0) return -Math.abs(angle);
+  return angle;
+}
+
 function buildPatternObjects(
   template: BoardTemplate,
   rng: Rng,
@@ -714,11 +720,12 @@ function buildPatternObjects(
 
   const rampAnchorBlockers: BoardBlockerDef[] = [];
   const ramps: BoardRampDef[] = template.rampSlots.map((slot) => {
-    const angle = clamp(
+    const rawAngle = clamp(
       slot.angle + jitter(rng, 4),
       template.rampAngles.min,
       template.rampAngles.max,
     );
+    const angle = fixWallAngle(slot.xRatio, rawAngle);
     const x = Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 14));
     const y = clamp(slot.y + jitter(rng, 14), SAFE_TOP_Y, SAFE_BOTTOM_Y);
     const angleRad = (angle * Math.PI) / 180;
@@ -763,7 +770,7 @@ function buildPatternObjects(
     y: clamp(slot.y + jitter(rng, 10), SAFE_TOP_Y, SAFE_BOTTOM_Y),
     w: 30,
     h: slot.h,
-    angle: slot.angle,
+    angle: fixWallAngle(slot.xRatio, slot.angle ?? 0),
     color: 0xbf7134,
   }));
   blockers.push(...segmentBlockers, ...rampAnchorBlockers);
