@@ -37,9 +37,6 @@ export class Rng {
 
   /** Erzeugt einen neuen, zufälligen Seed (für Run-Start). */
   static randomSeed(): number {
-    // Kombiniere Timestamp + Math.random() für bessere Eindeutigkeit
-    const timestamp = Date.now() & 0xffffff;
-    const random = Math.random() * 0xffffff;
-    return (timestamp ^ Math.floor(random)) >>> 0 || 0x9e3779b9;
+    return (Math.random() * 0xffffffff) >>> 0;
   }
 }
