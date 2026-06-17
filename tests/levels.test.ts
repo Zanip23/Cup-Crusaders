@@ -74,20 +74,34 @@ describe('Level-Progression (docs/11)', () => {
     }
   });
 
-  it('resolveBoardForDrop wechselt das Board nach jeder normalen Welle sichtbar', () => {
-    const boards = [1, 2, 3, 4, 5].map((wave) => resolveBoardForDrop('world_1', wave, 1234));
-
-    expect(boards[0].id).toContain('bar_cascade_early');
-    expect(boards[1].id).toContain('side_switch_early');
-    expect(boards[2].id).toContain('bar_cascade_early');
-    expect(boards[3].id).toContain('side_switch_early');
-    expect(boards[4].id).toContain('bar_cascade_early');
-    for (let i = 1; i < boards.length; i++) {
-      expect(boards[i].id).not.toBe(boards[i - 1].id);
-      expect(boards[i].platforms?.map((platform) => platform.x)).not.toEqual(
-        boards[i - 1].platforms?.map((platform) => platform.x),
-      );
+  it('resolveBoardForDrop ist pro (Welle, Seed) deterministisch', () => {
+    for (const wave of [1, 3, 7, 12, 15]) {
+      const a = resolveBoardForDrop('world_1', wave, 4242);
+      const b = resolveBoardForDrop('world_1', wave, 4242);
+      expect(a.id).toBe(b.id);
+      expect(a.platforms?.map((p) => p.x)).toEqual(b.platforms?.map((p) => p.x));
     }
+  });
+
+  it('resolveBoardForDrop erzeugt pro Run (Seed) sichtbar unterschiedliche Boards', () => {
+    // Gleiche Welle, verschiedene Run-Seeds → der Generator soll seed-gesteuert
+    // unterschiedliche Layouts (und über mehrere Seeds auch verschiedene
+    // Struktur-Templates) liefern, statt immer dasselbe Board zu zeigen.
+    const seeds = [1, 7, 42, 1234, 9999, 555, 808, 31337];
+    const templatesForWave1 = new Set<string>();
+    const layoutsForWave1 = new Set<string>();
+
+    for (const seed of seeds) {
+      const board = resolveBoardForDrop('world_1', 1, seed);
+      const templateId = board.id.replace(/^board_generated_\d+_\d+_\d+_\d+_/, '');
+      templatesForWave1.add(templateId);
+      layoutsForWave1.add((board.platforms ?? []).map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).join('|'));
+    }
+
+    // Über mehrere Runs müssen verschiedene Templates vorkommen ...
+    expect(templatesForWave1.size).toBeGreaterThan(1);
+    // ... und die konkreten Layouts dürfen sich nicht alle gleichen.
+    expect(layoutsForWave1.size).toBeGreaterThan(1);
   });
 
   it('ADVANCE_LEVEL setzt Welle/Transfer zurück, behält Upgrades', () => {

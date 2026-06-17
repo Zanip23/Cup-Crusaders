@@ -41,17 +41,22 @@ function waveProgress(level: LevelDef, waveNumber: number): number {
   return (waveNumber - 1) / (level.waves.length - 1);
 }
 
-function cycleTemplate(
-  templates: readonly BoardTemplateId[],
-  waveNumber: number,
-): readonly BoardTemplateId[] {
-  // Wichtig für das Spielgefühl: Nach jeder besiegten Welle soll sichtbar ein
-  // anderes Pachinko-Board kommen. Deshalb geben wir dem Generator pro Welle
-  // gezielt genau ein Template vor, statt ihn frei aus der gesamten Phase wählen
-  // zu lassen. Innerhalb dieses Templates bleiben Seed/Difficulty weiterhin
-  // deterministisch variiert.
-  return [templates[(waveNumber - 1) % templates.length]];
-}
+// Voller Pool an Struktur-Templates. Die einzelnen Templates sind die "Regeln"
+// (zulässige Plattform-/Gate-/Booster-Zonen, Risiko-Profil) — der Generator
+// würfelt daraus pro Run seed-gesteuert ein Board. Bewusst NICHT an die
+// Wellennummer gebunden, damit jeder Run sichtbar andere Boards erzeugt; die
+// Phase steuert nur Schwierigkeit/Budget und welche Features (Mystery/Booster)
+// erlaubt sind. pickTemplate gewichtet risikoarme Templates bei niedriger
+// Challenge höher, sodass frühe Wellen ruhiger und späte chaotischer ausfallen.
+const ALL_TEMPLATES: readonly BoardTemplateId[] = [
+  'bar_cascade',
+  'side_switch',
+  'dense_multiplier_wall',
+  'bonus_lane',
+  'booster_lane',
+  'split_multiplier_row',
+  'bonus_split_row',
+];
 
 function boardOptionsForWave(
   level: LevelDef,
@@ -62,10 +67,7 @@ function boardOptionsForWave(
 
   if (wave?.isBoss) {
     return {
-      allowedTemplates: cycleTemplate(
-        ['dense_multiplier_wall', 'bonus_lane', 'booster_lane'],
-        waveNumber,
-      ),
+      allowedTemplates: ALL_TEMPLATES,
       allowMystery: true,
       allowBoosters: true,
       budgetBonus: 26,
@@ -76,7 +78,7 @@ function boardOptionsForWave(
 
   if (progress < 0.34) {
     return {
-      allowedTemplates: cycleTemplate(['bar_cascade', 'side_switch'], waveNumber),
+      allowedTemplates: ALL_TEMPLATES,
       allowMystery: false,
       allowBoosters: false,
       budgetBonus: -14,
@@ -87,7 +89,7 @@ function boardOptionsForWave(
 
   if (progress < 0.67) {
     return {
-      allowedTemplates: cycleTemplate(['bar_cascade', 'bonus_lane', 'booster_lane'], waveNumber),
+      allowedTemplates: ALL_TEMPLATES,
       allowMystery: true,
       allowBoosters: true,
       budgetBonus: 6,
@@ -97,10 +99,7 @@ function boardOptionsForWave(
   }
 
   return {
-    allowedTemplates: cycleTemplate(
-      ['dense_multiplier_wall', 'bonus_lane', 'booster_lane'],
-      waveNumber,
-    ),
+    allowedTemplates: ALL_TEMPLATES,
     allowMystery: true,
     allowBoosters: true,
     budgetBonus: 18,
