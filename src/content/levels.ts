@@ -63,7 +63,7 @@ function boardOptionsForWave(
   if (wave?.isBoss) {
     return {
       allowedTemplates: cycleTemplate(
-        ['dense_multiplier_wall', 'bonus_lane', 'booster_lane'],
+        ['split_choice', 'booster_tunnel', 'risk_wall'],
         waveNumber,
       ),
       allowMystery: true,
@@ -76,7 +76,7 @@ function boardOptionsForWave(
 
   if (progress < 0.34) {
     return {
-      allowedTemplates: cycleTemplate(['bar_cascade', 'side_switch'], waveNumber),
+      allowedTemplates: cycleTemplate(['classic', 'snake'], waveNumber),
       allowMystery: false,
       allowBoosters: false,
       budgetBonus: -14,
@@ -87,7 +87,7 @@ function boardOptionsForWave(
 
   if (progress < 0.67) {
     return {
-      allowedTemplates: cycleTemplate(['bar_cascade', 'bonus_lane', 'booster_lane'], waveNumber),
+      allowedTemplates: cycleTemplate(['classic', 'snake', 'booster_tunnel'], waveNumber),
       allowMystery: true,
       allowBoosters: true,
       budgetBonus: 6,
@@ -98,7 +98,7 @@ function boardOptionsForWave(
 
   return {
     allowedTemplates: cycleTemplate(
-      ['dense_multiplier_wall', 'bonus_lane', 'booster_lane'],
+      ['split_choice', 'booster_tunnel', 'risk_wall'],
       waveNumber,
     ),
     allowMystery: true,
