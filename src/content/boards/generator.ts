@@ -60,7 +60,9 @@ export type BoardTemplateId =
   | 'side_switch'
   | 'dense_multiplier_wall'
   | 'bonus_lane'
-  | 'booster_lane';
+  | 'booster_lane'
+  | 'split_multiplier_row'
+  | 'bonus_split_row';
 
 type RiskRewardProfile = 'safe' | 'balanced' | 'swingy' | 'highRisk';
 
@@ -78,6 +80,22 @@ interface BinDistribution {
   mysteryCenterFromChallenge: number;
 }
 
+type SegmentKind = 'multiply' | 'add' | 'mystery';
+type SegmentColorRole = 'multiply' | 'bonus' | 'mystery';
+
+interface SegmentRowDef {
+  y: number;
+  segments: SegmentDef[];
+}
+
+interface SegmentDef {
+  xStart: number;
+  width: number;
+  kind: SegmentKind;
+  valueRange: readonly [number, number];
+  colorRole?: SegmentColorRole;
+}
+
 interface BoardTemplate {
   id: BoardTemplateId;
   pegZones: BoardZone[];
@@ -92,6 +110,7 @@ interface BoardTemplate {
   gateSlots: Array<{ xRatio: number; y: number; kind: 'multiply' | 'add' }>;
   boosterSlots: Array<{ xRatio: number; y: number; angle?: number }>;
   blockerSlots: Array<{ xRatio: number; y: number; angle: number; h: number }>;
+  segmentRows?: SegmentRowDef[];
 }
 
 const NO_PEG_ZONES: BoardZone[] = [];
@@ -241,6 +260,76 @@ const BOARD_TEMPLATES: BoardTemplate[] = [
       { xRatio: 0.38, y: 505, angle: 0, h: 150 },
       { xRatio: 0.62, y: 505, angle: 0, h: 150 },
       { xRatio: 0.5, y: 660, angle: 0, h: 170 },
+    ],
+  },
+  {
+    id: 'split_multiplier_row',
+    pegZones: NO_PEG_ZONES,
+    gateZones: NO_GATE_ZONES,
+    rampAngles: { min: -18, max: 18 },
+    boosterPositions: FULL_BOOSTER_ZONE,
+    binDistribution: { outer: 0.85, shoulder: 1.1, center: 1.3, mysteryCenterFromChallenge: 6 },
+    riskRewardProfile: 'balanced',
+    rampSlots: [
+      { xRatio: 0.18, y: 500, angle: -16, w: 155, label: 'split' },
+      { xRatio: 0.82, y: 760, angle: 16, w: 155, label: 'merge' },
+    ],
+    platformSlots: [{ xRatio: 0.5, y: 875, w: 420, labelKind: 'multiply' }],
+    gateSlots: [],
+    boosterSlots: [],
+    blockerSlots: [],
+    segmentRows: [
+      {
+        y: 390,
+        segments: [
+          { xStart: 56, width: 150, kind: 'multiply', valueRange: [3, 3] },
+          { xStart: 238, width: 280, kind: 'multiply', valueRange: [5, 8], colorRole: 'bonus' },
+          { xStart: 550, width: 140, kind: 'multiply', valueRange: [2, 2] },
+        ],
+      },
+      {
+        y: 645,
+        segments: [
+          { xStart: 82, width: 210, kind: 'add', valueRange: [5, 10], colorRole: 'bonus' },
+          { xStart: 330, width: 160, kind: 'multiply', valueRange: [2, 3] },
+          { xStart: 528, width: 170, kind: 'multiply', valueRange: [3, 5] },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'bonus_split_row',
+    pegZones: NO_PEG_ZONES,
+    gateZones: NO_GATE_ZONES,
+    rampAngles: { min: -22, max: 22 },
+    boosterPositions: FULL_BOOSTER_ZONE,
+    binDistribution: { outer: 0.75, shoulder: 1.2, center: 1.45, mysteryCenterFromChallenge: 4 },
+    riskRewardProfile: 'swingy',
+    rampSlots: [
+      { xRatio: 0.2, y: 540, angle: -18, w: 160, label: 'bonus' },
+      { xRatio: 0.8, y: 780, angle: 18, w: 160, label: 'bonus' },
+    ],
+    platformSlots: [{ xRatio: 0.5, y: 875, w: 390, labelKind: 'multiply' }],
+    gateSlots: [],
+    boosterSlots: [{ xRatio: 0.5, y: 720, angle: 0 }],
+    blockerSlots: [],
+    segmentRows: [
+      {
+        y: 400,
+        segments: [
+          { xStart: 58, width: 210, kind: 'add', valueRange: [6, 12], colorRole: 'bonus' },
+          { xStart: 305, width: 140, kind: 'multiply', valueRange: [2, 2] },
+          { xStart: 482, width: 210, kind: 'add', valueRange: [6, 12], colorRole: 'bonus' },
+        ],
+      },
+      {
+        y: 620,
+        segments: [
+          { xStart: 76, width: 175, kind: 'multiply', valueRange: [2, 3] },
+          { xStart: 288, width: 175, kind: 'mystery', valueRange: [0, 0], colorRole: 'mystery' },
+          { xStart: 500, width: 175, kind: 'multiply', valueRange: [2, 3] },
+        ],
+      },
     ],
   },
 ];
@@ -437,6 +526,90 @@ function spendBudget(budget: { remaining: number }, cost: number): boolean {
   return true;
 }
 
+function segmentColor(colorRole: SegmentColorRole | undefined, kind: SegmentKind): number {
+  const role = colorRole ?? (kind === 'add' ? 'bonus' : kind);
+  if (role === 'bonus') return 0x36d66b;
+  if (role === 'mystery') return 0x9a5cff;
+  return 0xf4c430;
+}
+
+function segmentValue(segment: SegmentDef, rng: Rng, challenge: number): number {
+  const [min, max] = segment.valueRange;
+  const cappedMax =
+    segment.kind === 'multiply' ? Math.min(max, maxMultiplierForDifficulty(challenge)) : max;
+  return rng.intBetween(Math.min(min, cappedMax), Math.max(min, cappedMax));
+}
+
+function segmentLabel(kind: SegmentKind, value: number): string {
+  if (kind === 'mystery') return '???';
+  if (kind === 'add') return 'Bonus';
+  return `x${value}`;
+}
+
+function segmentEffect(kind: SegmentKind, value: number, challenge: number) {
+  if (kind === 'mystery') return mysteryEffectFor(challenge);
+  return effectFor(kind, value);
+}
+
+function segmentCost(segment: SegmentDef, value: number): number {
+  if (segment.kind === 'mystery') return MYSTERY_COST;
+  return platformCost(segment.kind, value, segment.width);
+}
+
+function buildSegmentRow(
+  y: number,
+  segments: SegmentDef[],
+  rng: Rng,
+  challenge: number,
+  budget?: { remaining: number },
+): { platforms: BoardPlatformDef[]; blockers: BoardBlockerDef[] } {
+  const edgePadding = 44;
+  const platforms: BoardPlatformDef[] = [];
+  const blockers: BoardBlockerDef[] = [];
+  const orderedSegments = [...segments].sort((a, b) => a.xStart - b.xStart);
+  const rowY = clamp(y + jitter(rng, 8), SAFE_TOP_Y, SAFE_BOTTOM_Y);
+
+  for (const segment of orderedSegments) {
+    const value = segmentValue(segment, rng, challenge);
+    if (budget && !spendBudget(budget, segmentCost(segment, value))) continue;
+
+    const halfWidth = segment.width / 2;
+    platforms.push({
+      x: clamp(
+        Math.round(segment.xStart + halfWidth + jitter(rng, 6)),
+        edgePadding + halfWidth,
+        GAME_WIDTH - edgePadding - halfWidth,
+      ),
+      y: rowY,
+      w: segment.width,
+      h: 28,
+      angle: jitter(rng, 2),
+      label: segmentLabel(segment.kind, value),
+      effect: segmentEffect(segment.kind, value, challenge),
+      color: segmentColor(segment.colorRole, segment.kind),
+    });
+  }
+
+  for (let index = 1; index < orderedSegments.length; index++) {
+    const previous = orderedSegments[index - 1];
+    const current = orderedSegments[index];
+    const previousEnd = previous.xStart + previous.width;
+    const boundaryX = Math.round((previousEnd + current.xStart) / 2 + jitter(rng, 4));
+
+    blockers.push({
+      x: clamp(boundaryX, edgePadding, GAME_WIDTH - edgePadding),
+      y: clamp(rowY + 38, SAFE_TOP_Y, SAFE_BOTTOM_Y),
+      w: 14,
+      h: clamp(86 + challenge * 4 + jitter(rng, 10), 86, 138),
+      angle: 0,
+      label: 'split',
+      color: 0x7a4a24,
+    });
+  }
+
+  return { platforms, blockers };
+}
+
 function buildPatternObjects(
   template: BoardTemplate,
   rng: Rng,
@@ -494,6 +667,13 @@ function buildPatternObjects(
     });
   }
 
+  const segmentBlockers: BoardBlockerDef[] = [];
+  for (const row of template.segmentRows ?? []) {
+    const segmentObjects = buildSegmentRow(row.y, row.segments, rng, challenge, budget);
+    platforms.push(...segmentObjects.platforms);
+    segmentBlockers.push(...segmentObjects.blockers);
+  }
+
   const ramps: BoardRampDef[] = template.rampSlots.map((slot) => ({
     x: Math.round(GAME_WIDTH * slot.xRatio + jitter(rng, 14)),
     y: clamp(slot.y + jitter(rng, 14), SAFE_TOP_Y, SAFE_BOTTOM_Y),
@@ -527,6 +707,7 @@ function buildPatternObjects(
     label: 'risk',
     color: 0x7a4a24,
   }));
+  blockers.push(...segmentBlockers);
 
   return { gates, platforms, ramps, boosters, blockers };
 }
