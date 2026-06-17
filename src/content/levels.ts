@@ -41,6 +41,18 @@ function waveProgress(level: LevelDef, waveNumber: number): number {
   return (waveNumber - 1) / (level.waves.length - 1);
 }
 
+function cycleTemplate(
+  templates: readonly BoardTemplateId[],
+  waveNumber: number,
+): readonly BoardTemplateId[] {
+  // Wichtig für das Spielgefühl: Nach jeder besiegten Welle soll sichtbar ein
+  // anderes Pachinko-Board kommen. Deshalb geben wir dem Generator pro Welle
+  // gezielt genau ein Template vor, statt ihn frei aus der gesamten Phase wählen
+  // zu lassen. Innerhalb dieses Templates bleiben Seed/Difficulty weiterhin
+  // deterministisch variiert.
+  return [templates[(waveNumber - 1) % templates.length]];
+}
+
 function boardOptionsForWave(
   level: LevelDef,
   waveNumber: number,
@@ -50,7 +62,10 @@ function boardOptionsForWave(
 
   if (wave?.isBoss) {
     return {
-      allowedTemplates: ['dense_multiplier_wall', 'bonus_lane', 'booster_lane'],
+      allowedTemplates: cycleTemplate(
+        ['dense_multiplier_wall', 'bonus_lane', 'booster_lane'],
+        waveNumber,
+      ),
       allowMystery: true,
       allowBoosters: true,
       budgetBonus: 26,
@@ -61,7 +76,7 @@ function boardOptionsForWave(
 
   if (progress < 0.34) {
     return {
-      allowedTemplates: ['bar_cascade', 'side_switch'],
+      allowedTemplates: cycleTemplate(['bar_cascade', 'side_switch'], waveNumber),
       allowMystery: false,
       allowBoosters: false,
       budgetBonus: -14,
@@ -72,7 +87,7 @@ function boardOptionsForWave(
 
   if (progress < 0.67) {
     return {
-      allowedTemplates: ['bar_cascade', 'bonus_lane', 'booster_lane'],
+      allowedTemplates: cycleTemplate(['bar_cascade', 'bonus_lane', 'booster_lane'], waveNumber),
       allowMystery: true,
       allowBoosters: true,
       budgetBonus: 6,
@@ -82,7 +97,10 @@ function boardOptionsForWave(
   }
 
   return {
-    allowedTemplates: ['dense_multiplier_wall', 'bonus_lane', 'booster_lane'],
+    allowedTemplates: cycleTemplate(
+      ['dense_multiplier_wall', 'bonus_lane', 'booster_lane'],
+      waveNumber,
+    ),
     allowMystery: true,
     allowBoosters: true,
     budgetBonus: 18,
