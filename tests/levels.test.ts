@@ -51,6 +51,29 @@ describe('Level-Progression (docs/11)', () => {
     expect(new Set([early.id, mid.id, late.id, boss.id]).size).toBe(4);
   });
 
+  it('generierte Drop-Boards setzen keine Holzpfosten mitten in Multiplikator-Balken', () => {
+    for (const seed of [7, 1234, 9999]) {
+      for (const wave of [1, 4, 7, 10, 15]) {
+        const board = resolveBoardForDrop('world_1', wave, seed);
+        for (const blocker of board.blockers ?? []) {
+          for (const platform of board.platforms ?? []) {
+            const overlapsVertically =
+              Math.abs(blocker.y - platform.y) < (blocker.h + platform.h) / 2;
+            const edgeTolerance = blocker.w / 2 + 12;
+            const leftEdge = platform.x - platform.w / 2;
+            const rightEdge = platform.x + platform.w / 2;
+            const isInsidePlatformInterior =
+              overlapsVertically &&
+              blocker.x > leftEdge + edgeTolerance &&
+              blocker.x < rightEdge - edgeTolerance;
+
+            expect(isInsidePlatformInterior).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
   it('ADVANCE_LEVEL setzt Welle/Transfer zurück, behält Upgrades', () => {
     let s = reducer(createInitialState(), {
       type: 'START_RUN',
