@@ -27,7 +27,7 @@ async function waitPhase(page: Page, phase: string, timeout = 90_000) {
   );
 }
 
-test.skip('zwei Wellen Auto-Battle → Drop → Shop, ohne Browser-Fehler', async ({ page }, testInfo) => {
+test('zwei Wellen Auto-Battle → Drop → Shop, ohne Browser-Fehler', async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on('console', (m) => m.type() === 'error' && errors.push(`console: ${m.text()}`));
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
