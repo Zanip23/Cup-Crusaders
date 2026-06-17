@@ -50,9 +50,9 @@ export const MAX_MULTIPLIER_BY_DIFFICULTY: ReadonlyArray<{
   multiplier: number;
 }> = [
   { maxDifficulty: 3, multiplier: 3 },
-  { maxDifficulty: 6, multiplier: 4 },
-  { maxDifficulty: 9, multiplier: 5 },
-  { maxDifficulty: Number.POSITIVE_INFINITY, multiplier: 6 },
+  { maxDifficulty: 5, multiplier: 5 },
+  { maxDifficulty: 8, multiplier: 8 },
+  { maxDifficulty: Number.POSITIVE_INFINITY, multiplier: 10 },
 ];
 
 export type BoardTemplateId =
@@ -365,13 +365,25 @@ function maxMultiplierForDifficulty(challenge: number): number {
 
 function effectValue(kind: 'multiply' | 'add', challenge: number, rng: Rng, riskScore = 0): number {
   if (kind === 'multiply') {
-    const riskBonus = riskScore >= 5 ? 1 : 0;
-    const safePenalty = riskScore <= 2 ? 1 : 0;
-    return clamp(
-      2 + Math.floor((challenge + rng.intBetween(0, 2)) / 4) + riskBonus - safePenalty,
-      2,
-      maxMultiplierForDifficulty(challenge),
+    const maxMultiplier = maxMultiplierForDifficulty(challenge);
+    const isEarlyOrSafe = challenge <= 3 || riskScore <= 2.5;
+    const riskTier = clamp(Math.floor((riskScore - 2.5) / 1.4), 0, 4);
+    const challengeTier = Math.floor((challenge - 1) / 3);
+
+    if (isEarlyOrSafe) {
+      return clamp(
+        2 + (challenge >= 5 && rng.next() < 0.35 ? 1 : 0),
+        2,
+        Math.min(3, maxMultiplier),
+      );
+    }
+
+    const visibilityBonus = rng.weightedPick([0, 1, 2, 3], (bonus) =>
+      bonus === 0 ? 2 : bonus === 1 ? 5 : bonus === 2 ? 4 : 2,
     );
+    const value = 2 + challengeTier + riskTier + visibilityBonus;
+
+    return clamp(value, 2, maxMultiplier);
   }
   return clamp(3 + challenge + rng.intBetween(0, 3), 4, 16);
 }
@@ -396,10 +408,11 @@ function slotRiskScore(
   slot: { xRatio: number; y: number; w?: number },
   blockerCount: number,
 ): number {
-  const centerRisk = 1 - Math.min(1, Math.abs(slot.xRatio - 0.5) / 0.5);
+  const sideRisk = Math.min(1, Math.abs(slot.xRatio - 0.5) / 0.5);
   const depthRisk = clamp((slot.y - SAFE_TOP_Y) / (SAFE_BOTTOM_Y - SAFE_TOP_Y), 0, 1);
-  const narrowRisk = slot.w ? clamp((210 - slot.w) / 90, 0, 1) : 0.45;
-  return centerRisk * 3 + depthRisk * 2 + narrowRisk * 2 + blockerCount * 0.5;
+  const narrowRisk = slot.w ? clamp((260 - slot.w) / 140, 0, 1) : 0.45;
+  const wideSafety = slot.w ? clamp((slot.w - 360) / 160, 0, 1) : 0;
+  return sideRisk * 3 + depthRisk * 2 + narrowRisk * 2 + blockerCount * 0.5 - wideSafety * 2;
 }
 
 function gateCost(kind: 'multiply' | 'add', value: number): number {
