@@ -80,7 +80,7 @@ interface BinDistribution {
   mysteryCenterFromChallenge: number;
 }
 
-type SegmentKind = 'multiply' | 'add' | 'mystery';
+type SegmentKind = 'multiply' | 'mystery';
 type SegmentColorRole = 'multiply' | 'bonus' | 'mystery';
 
 interface SegmentRowDef {
@@ -106,8 +106,8 @@ interface BoardTemplate {
   riskRewardProfile: RiskRewardProfile;
 
   rampSlots: Array<{ xRatio: number; y: number; angle: number; w: number; label: string }>;
-  platformSlots: Array<{ xRatio: number; y: number; w: number; labelKind: 'multiply' | 'add' }>;
-  gateSlots: Array<{ xRatio: number; y: number; kind: 'multiply' | 'add' }>;
+  platformSlots: Array<{ xRatio: number; y: number; w: number; labelKind: 'multiply' }>;
+  gateSlots: Array<{ xRatio: number; y: number; kind: 'multiply' }>;
   boosterSlots: Array<{ xRatio: number; y: number; angle?: number }>;
   blockerSlots: Array<{ xRatio: number; y: number; angle: number; h: number }>;
   segmentRows?: SegmentRowDef[];
@@ -133,7 +133,7 @@ const BOARD_TEMPLATES: BoardTemplate[] = [
     platformSlots: [
       { xRatio: 0.5, y: 365, w: 520, labelKind: 'multiply' },
       { xRatio: 0.34, y: 520, w: 310, labelKind: 'multiply' },
-      { xRatio: 0.72, y: 655, w: 230, labelKind: 'add' },
+      { xRatio: 0.72, y: 655, w: 230, labelKind: 'multiply' },
       { xRatio: 0.42, y: 790, w: 390, labelKind: 'multiply' },
       { xRatio: 0.68, y: 880, w: 250, labelKind: 'multiply' },
     ],
@@ -160,7 +160,7 @@ const BOARD_TEMPLATES: BoardTemplate[] = [
     platformSlots: [
       { xRatio: 0.28, y: 370, w: 300, labelKind: 'multiply' },
       { xRatio: 0.72, y: 505, w: 300, labelKind: 'multiply' },
-      { xRatio: 0.3, y: 650, w: 340, labelKind: 'add' },
+      { xRatio: 0.3, y: 650, w: 340, labelKind: 'multiply' },
       { xRatio: 0.72, y: 790, w: 360, labelKind: 'multiply' },
       { xRatio: 0.5, y: 880, w: 420, labelKind: 'multiply' },
     ],
@@ -191,7 +191,7 @@ const BOARD_TEMPLATES: BoardTemplate[] = [
       { xRatio: 0.27, y: 640, w: 260, labelKind: 'multiply' },
       { xRatio: 0.73, y: 640, w: 260, labelKind: 'multiply' },
       { xRatio: 0.5, y: 780, w: 480, labelKind: 'multiply' },
-      { xRatio: 0.5, y: 880, w: 300, labelKind: 'add' },
+      { xRatio: 0.5, y: 880, w: 300, labelKind: 'multiply' },
     ],
     gateSlots: [],
     boosterSlots: [],
@@ -217,11 +217,11 @@ const BOARD_TEMPLATES: BoardTemplate[] = [
     ],
     platformSlots: [
       { xRatio: 0.5, y: 365, w: 360, labelKind: 'multiply' },
-      { xRatio: 0.27, y: 515, w: 220, labelKind: 'add' },
-      { xRatio: 0.73, y: 515, w: 220, labelKind: 'add' },
+      { xRatio: 0.27, y: 515, w: 220, labelKind: 'multiply' },
+      { xRatio: 0.73, y: 515, w: 220, labelKind: 'multiply' },
       { xRatio: 0.5, y: 675, w: 520, labelKind: 'multiply' },
       { xRatio: 0.32, y: 835, w: 260, labelKind: 'multiply' },
-      { xRatio: 0.72, y: 835, w: 240, labelKind: 'add' },
+      { xRatio: 0.72, y: 835, w: 240, labelKind: 'multiply' },
     ],
     gateSlots: [],
     boosterSlots: [],
@@ -245,11 +245,11 @@ const BOARD_TEMPLATES: BoardTemplate[] = [
     ],
     platformSlots: [
       { xRatio: 0.5, y: 360, w: 500, labelKind: 'multiply' },
-      { xRatio: 0.26, y: 505, w: 230, labelKind: 'add' },
+      { xRatio: 0.26, y: 505, w: 230, labelKind: 'multiply' },
       { xRatio: 0.74, y: 505, w: 230, labelKind: 'multiply' },
       { xRatio: 0.5, y: 660, w: 420, labelKind: 'multiply' },
       { xRatio: 0.28, y: 815, w: 260, labelKind: 'multiply' },
-      { xRatio: 0.72, y: 880, w: 260, labelKind: 'add' },
+      { xRatio: 0.72, y: 880, w: 260, labelKind: 'multiply' },
     ],
     gateSlots: [],
     boosterSlots: [
@@ -290,7 +290,7 @@ const BOARD_TEMPLATES: BoardTemplate[] = [
       {
         y: 645,
         segments: [
-          { xStart: 82, width: 210, kind: 'add', valueRange: [5, 10], colorRole: 'bonus' },
+          { xStart: 82, width: 210, kind: 'multiply', valueRange: [2, 4], colorRole: 'multiply' },
           { xStart: 330, width: 160, kind: 'multiply', valueRange: [2, 3] },
           { xStart: 528, width: 170, kind: 'multiply', valueRange: [3, 5] },
         ],
@@ -317,9 +317,9 @@ const BOARD_TEMPLATES: BoardTemplate[] = [
       {
         y: 400,
         segments: [
-          { xStart: 58, width: 210, kind: 'add', valueRange: [6, 12], colorRole: 'bonus' },
+          { xStart: 58, width: 210, kind: 'multiply', valueRange: [2, 5], colorRole: 'multiply' },
           { xStart: 305, width: 140, kind: 'multiply', valueRange: [2, 2] },
-          { xStart: 482, width: 210, kind: 'add', valueRange: [6, 12], colorRole: 'bonus' },
+          { xStart: 482, width: 210, kind: 'multiply', valueRange: [2, 5], colorRole: 'multiply' },
         ],
       },
       {
@@ -452,29 +452,26 @@ function maxMultiplierForDifficulty(challenge: number): number {
   );
 }
 
-function effectValue(kind: 'multiply' | 'add', challenge: number, rng: Rng, riskScore = 0): number {
-  if (kind === 'multiply') {
-    const maxMultiplier = maxMultiplierForDifficulty(challenge);
-    const isEarlyOrSafe = challenge <= 3 || riskScore <= 2.5;
-    const riskTier = clamp(Math.floor((riskScore - 2.5) / 1.4), 0, 4);
-    const challengeTier = Math.floor((challenge - 1) / 3);
+function effectValue(_kind: 'multiply', challenge: number, rng: Rng, riskScore = 0): number {
+  const maxMultiplier = maxMultiplierForDifficulty(challenge);
+  const isEarlyOrSafe = challenge <= 3 || riskScore <= 2.5;
+  const riskTier = clamp(Math.floor((riskScore - 2.5) / 1.4), 0, 4);
+  const challengeTier = Math.floor((challenge - 1) / 3);
 
-    if (isEarlyOrSafe) {
-      return clamp(
-        2 + (challenge >= 5 && rng.next() < 0.35 ? 1 : 0),
-        2,
-        Math.min(3, maxMultiplier),
-      );
-    }
-
-    const visibilityBonus = rng.weightedPick([0, 1, 2, 3], (bonus) =>
-      bonus === 0 ? 2 : bonus === 1 ? 5 : bonus === 2 ? 4 : 2,
+  if (isEarlyOrSafe) {
+    return clamp(
+      2 + (challenge >= 5 && rng.next() < 0.35 ? 1 : 0),
+      2,
+      Math.min(3, maxMultiplier),
     );
-    const value = 2 + challengeTier + riskTier + visibilityBonus;
-
-    return clamp(value, 2, maxMultiplier);
   }
-  return clamp(3 + challenge + rng.intBetween(0, 3), 4, 16);
+
+  const visibilityBonus = rng.weightedPick([0, 1, 2, 3], (bonus) =>
+    bonus === 0 ? 2 : bonus === 1 ? 5 : bonus === 2 ? 4 : 2,
+  );
+  const value = 2 + challengeTier + riskTier + visibilityBonus;
+
+  return clamp(value, 2, maxMultiplier);
 }
 
 function effectFor(kind: 'multiply' | 'add', value: number) {
@@ -504,16 +501,12 @@ function slotRiskScore(
   return sideRisk * 3 + depthRisk * 2 + narrowRisk * 2 + blockerCount * 0.5 - wideSafety * 2;
 }
 
-function gateCost(kind: 'multiply' | 'add', value: number): number {
-  if (kind === 'multiply') return GATE_COSTS.multiply + (value - 2) * GATE_COSTS.multiplierStep;
-  return GATE_COSTS.add + Math.max(0, value - 4) * GATE_COSTS.addStep;
+function gateCost(_kind: 'multiply', value: number): number {
+  return GATE_COSTS.multiply + (value - 2) * GATE_COSTS.multiplierStep;
 }
 
-function platformCost(kind: 'multiply' | 'add', value: number, width: number): number {
-  const base =
-    kind === 'multiply'
-      ? PLATFORM_COSTS.multiply + (value - 2) * PLATFORM_COSTS.multiplierStep
-      : PLATFORM_COSTS.add + Math.max(0, value - 4) * PLATFORM_COSTS.addStep;
+function platformCost(_kind: 'multiply', value: number, width: number): number {
+  const base = PLATFORM_COSTS.multiply + (value - 2) * PLATFORM_COSTS.multiplierStep;
   return Math.max(
     1,
     base - (width >= PLATFORM_COSTS.widthDiscountThreshold ? PLATFORM_COSTS.wideDiscount : 0),
@@ -527,7 +520,7 @@ function spendBudget(budget: { remaining: number }, cost: number): boolean {
 }
 
 function segmentColor(colorRole: SegmentColorRole | undefined, kind: SegmentKind): number {
-  const role = colorRole ?? (kind === 'add' ? 'bonus' : kind);
+  const role = colorRole ?? kind;
   if (role === 'bonus') return 0x20b457;
   if (role === 'mystery') return 0x7b4ee6;
   return 0xf2a91c;
@@ -535,14 +528,12 @@ function segmentColor(colorRole: SegmentColorRole | undefined, kind: SegmentKind
 
 function segmentValue(segment: SegmentDef, rng: Rng, challenge: number): number {
   const [min, max] = segment.valueRange;
-  const cappedMax =
-    segment.kind === 'multiply' ? Math.min(max, maxMultiplierForDifficulty(challenge)) : max;
+  const cappedMax = Math.min(max, maxMultiplierForDifficulty(challenge));
   return rng.intBetween(Math.min(min, cappedMax), Math.max(min, cappedMax));
 }
 
 function segmentLabel(kind: SegmentKind, value: number): string {
   if (kind === 'mystery') return '???';
-  if (kind === 'add') return 'Bonus';
   return `X${value}`;
 }
 

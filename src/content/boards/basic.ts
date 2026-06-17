@@ -32,9 +32,6 @@ function defaultBins() {
 function mult(factor: number): Effect {
   return { type: 'gateMultiply', params: { factor } };
 }
-function bonus(amount: number): Effect {
-  return { type: 'gateAdd', params: { amount } };
-}
 function mystery(pool: 'standard' | 'risky' = 'standard'): Effect {
   return createMysteryEffect(pool);
 }
@@ -107,9 +104,9 @@ export const BOARD_DENSE: BoardDef = {
   catcherWidth: 150,
   pegs: [],
   platforms: [
-    // Reihe 1: Bonus | x2 | Bonus
-    bar(W * 0.16, 400, 230, 'Bonus', bonus(6), BAR_COLOR.high),
-    bar(W * 0.84, 400, 230, 'Bonus', bonus(6), BAR_COLOR.high),
+    // Reihe 1: x3 | x2 | x3
+    bar(W * 0.16, 400, 230, 'x3', mult(3), BAR_COLOR.high),
+    bar(W * 0.84, 400, 230, 'x3', mult(3), BAR_COLOR.high),
     bar(W * 0.5, 400, 180, 'x2', mult(2), BAR_COLOR.mult),
     // Reihe 2: x4 | x3
     bar(W * 0.42, 600, 430, 'x4', mult(4), BAR_COLOR.high),
