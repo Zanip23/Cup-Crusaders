@@ -43,9 +43,9 @@ type RevealableBoardElement = {
   visual: Phaser.GameObjects.Container;
   revealed: boolean;
 };
-const BALL_RADIUS = 7.7;
-const DRIP_INTERVAL_MS = 22;
-const BALLS_PER_DRIP = 2; // mehrere Bälle pro Tick → dichter Strom (Masse)
+const BALL_RADIUS = 11;
+const DRIP_INTERVAL_MS = 42;
+const BALLS_PER_DRIP = 1; // einzeln gespawnt, damit größere Bälle nicht direkt überlappen
 const STRONG_GATE_THRESHOLD = 3;
 const SPIN_TIMEOUT_MS = 10000; // harte Timeout-Sicherung: Phase endet garantiert
 const NO_CATCH_END_MS = 800; // Becher füllt sich seit 0,8s nicht mehr → Phase beenden
@@ -155,7 +155,7 @@ export class DropScene extends Phaser.Scene {
   // Phaser-Frame-Loop: Live-Ballzähler oben aktualisieren (Bälle im Spiel).
   update(): void {
     this.updateBoardMotion();
-    
+
     // Wischspur / Motion Blur für alle Bälle
     for (const go of this.active) {
       if (go.body) {
@@ -607,8 +607,8 @@ export class DropScene extends Phaser.Scene {
   }
 
   private spawnBallFromCup(): void {
-    const x = this.cup.x + Phaser.Math.Between(-22, 22);
-    const y = CUP_Y + Phaser.Math.Between(18, 34);
+    const x = this.cup.x + Phaser.Math.Between(-26, 26);
+    const y = CUP_Y + Phaser.Math.Between(22, 38);
     const ball = this.add.circle(x, y, BALL_RADIUS, 0xffffff).setStrokeStyle(1.5, 0x000000, 0.4);
     this.initBall(ball, x, y);
     this.matter.add.gameObject(ball, {
@@ -619,7 +619,8 @@ export class DropScene extends Phaser.Scene {
       label: 'ball',
     });
     const body = ball.body as MatterBody;
-    body.collisionFilter.group = -1; // Bälle kollidieren nicht untereinander (Perf)
+    // Standard-Kollisionsgruppe behalten: Bälle stoßen sich gegenseitig ab.
+    // Dadurch überlagern sie sich nicht mehr und können spannende Staus bilden.
     body.velocity.x = Phaser.Math.FloatBetween(-0.9, 0.9) + (x - this.cup.x) * 0.025;
     body.velocity.y = Phaser.Math.FloatBetween(1.2, 2.7);
     this.active.add(ball);
@@ -784,14 +785,17 @@ export class DropScene extends Phaser.Scene {
     const sourceBody = sourceBall.body as MatterBody | null;
     for (let i = 0; i < spawnCount; i += 1) {
       const side = i % 2 === 0 ? -1 : 1;
-      const spread = 10 + Math.floor(i / 2) * 7;
+      const spread = BALL_RADIUS * 2.35 + Math.floor(i / 2) * BALL_RADIUS * 1.35;
       const x = Phaser.Math.Clamp(
         sourceBall.x + side * spread,
         BALL_RADIUS,
         GAME_WIDTH - BALL_RADIUS,
       );
-      const y = sourceBall.y - Phaser.Math.Between(4, 12);
-      const ball = this.add.circle(x, y, BALL_RADIUS, 0xffffff).setStrokeStyle(1.5, 0x000000, 0.4).setDepth(sourceBall.depth);
+      const y = sourceBall.y - BALL_RADIUS * 2.2 - Math.floor(i / 2) * BALL_RADIUS * 0.6;
+      const ball = this.add
+        .circle(x, y, BALL_RADIUS, 0xffffff)
+        .setStrokeStyle(1.5, 0x000000, 0.4)
+        .setDepth(sourceBall.depth);
       this.initBall(ball, x, y, inheritedGates);
       this.matter.add.gameObject(ball, {
         shape: { type: 'circle', radius: BALL_RADIUS },
@@ -801,7 +805,8 @@ export class DropScene extends Phaser.Scene {
         label: 'ball',
       });
       const body = ball.body as MatterBody;
-      body.collisionFilter.group = -1; // Bälle kollidieren nicht untereinander (Perf)
+      // Bonusbälle kollidieren ebenfalls mit anderen Bällen, damit keine sichtbaren
+      // Überlagerungen entstehen und Multiplikatoren echte Ball-Staus auslösen können.
       body.velocity.x =
         (sourceBody?.velocity.x ?? 0) * 0.35 + side * Phaser.Math.FloatBetween(1.7, 3.2);
       body.velocity.y =
@@ -924,7 +929,7 @@ export class DropScene extends Phaser.Scene {
   private sweep(): void {
     if (this.finished) return;
     const now = this.time.now;
-    
+
     // Becher füllt sich nicht mehr: Ist alles ausgeschüttet, hat der Becher schon
     // Bälle (≥1 Treffer) und kam seit NO_CATCH_END_MS keiner mehr dazu → Phase
     // beenden. Genau das Gefühl „alle Bälle sind drin, jetzt weiter".

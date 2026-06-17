@@ -28,7 +28,7 @@ interface CircleObstacle {
 const BALLS_TESTED = 64;
 const EDGE_PADDING = 24;
 const CUP_Y = 180;
-const BALL_RADIUS = 9;
+const BALL_RADIUS = 11;
 const MIN_COLLECTED_RATIO = 0.55;
 const MIN_REACHABLE_BIN_RATIO = 0.4;
 const MAX_STUCK_RATIO = 0.45;
@@ -175,15 +175,12 @@ export function evaluateBoardPlayability(board: BoardDef, seed: number): BoardPl
   const lostRatio = 1 - collectedRatio;
   const stuckCount = BALLS_TESTED - collected;
   const binCount = board.bins?.length ?? 0;
-  const reachableBinRatio =
-    binCount === 0 ? 0 : reachableBinIndexes.size / binCount;
+  const reachableBinRatio = binCount === 0 ? 0 : reachableBinIndexes.size / binCount;
   const reasons: string[] = [];
 
   if (binCount === 0) reasons.push('Board hat keine Sammel-Bins.');
   if (reachableBinRatio < MIN_REACHABLE_BIN_RATIO) {
-    reasons.push(
-      `Zu wenige Bins statisch erreichbar (${reachableBinIndexes.size}/${binCount}).`,
-    );
+    reasons.push(`Zu wenige Bins statisch erreichbar (${reachableBinIndexes.size}/${binCount}).`);
   }
   if (collectedRatio < MIN_COLLECTED_RATIO) {
     reasons.push(`Geschätzte Sammelquote zu niedrig (${Math.round(collectedRatio * 100)}%).`);
