@@ -48,6 +48,18 @@ describe('reducer — Run-Lebenszyklus & transfer-Vertrag', () => {
     expect(afterDrop.run.phase).toBe('shop');
   });
 
+  it('DROP_COMPLETE addiert Bälle zur bestehenden Währung (Sparen möglich)', () => {
+    const start = createInitialState();
+    // Simulieren, dass wir bereits Währung vom vorherigen Shop-Besuch haben
+    const stateWithCurrency = {
+      ...start,
+      run: { ...start.run, phase: 'drop' as const, currency: 40 },
+    };
+
+    const afterDrop = reducer(stateWithCurrency, { type: 'DROP_COMPLETE', balls: 50 });
+    expect(afterDrop.run.currency).toBe(90);
+  });
+
   it('SHOP_BUY zieht Währung ab; unbezahlbarer Kauf ist ein No-op', () => {
     let s = createInitialState();
     s = run(s, [

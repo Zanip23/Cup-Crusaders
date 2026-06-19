@@ -107,13 +107,13 @@ export function reducer(state: GameState, action: Action): GameState {
       return { ...state, run: { ...state.run, phase: 'drop' } };
 
     case 'DROP_COMPLETE':
-      // Drop schreibt ballsFromDrop und übergibt sie als Shop-Währung (docs/00, docs/09).
+      // Drop schreibt ballsFromDrop und übergibt sie als Shop-Währung (inklusive gesparter Bälle).
       return {
         ...state,
         run: {
           ...state.run,
           phase: 'shop',
-          currency: action.balls,
+          currency: state.run.currency + action.balls,
           transfer: { ...state.run.transfer, ballsFromDrop: action.balls },
         },
       };
