@@ -15,6 +15,7 @@ export type Action =
   | { type: 'DROP_COMPLETE'; balls: number }
   // Shop-Phase: Käufe ziehen Währung ab, Abschluss erhöht die Welle
   | { type: 'SHOP_BUY'; upgradeId: string; cost: number }
+  | { type: 'SHOP_REFUND'; upgradeId: string; cost: number }
   | { type: 'SHOP_COMPLETE' }
   // Level-Progression (Boss besiegt → nächstes Level im selben Run)
   | { type: 'ADVANCE_LEVEL'; levelId: string; totalWaves: number }

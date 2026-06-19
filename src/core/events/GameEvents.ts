@@ -8,6 +8,7 @@ export enum GameEvent {
   CombatComplete = 'combat.complete',
   DropComplete = 'drop.complete',
   ShopBuy = 'shop.buy',
+  ShopRefund = 'shop.refund',
   ShopComplete = 'shop.complete',
   PlayerDied = 'player.died',
   // Lebenszyklus
@@ -22,6 +23,7 @@ export interface GameEventPayloads {
   [GameEvent.CombatComplete]: Record<string, never>;
   [GameEvent.DropComplete]: { balls: number };
   [GameEvent.ShopBuy]: { upgradeId: string; cost: number };
+  [GameEvent.ShopRefund]: { upgradeId: string; cost: number };
   [GameEvent.ShopComplete]: { pickedId?: string };
   [GameEvent.PlayerDied]: Record<string, never>;
   [GameEvent.StartRun]: { levelId: string };

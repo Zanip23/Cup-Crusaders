@@ -130,6 +130,17 @@ export function reducer(state: GameState, action: Action): GameState {
       };
     }
 
+    case 'SHOP_REFUND': {
+      const upgradeIndex = state.run.upgrades.lastIndexOf(action.upgradeId);
+      if (upgradeIndex === -1) return state; // nicht vorhanden → no-op
+      const newUpgrades = [...state.run.upgrades];
+      newUpgrades.splice(upgradeIndex, 1);
+      return {
+        ...state,
+        run: { ...state.run, currency: state.run.currency + action.cost, upgrades: newUpgrades },
+      };
+    }
+
     case 'SHOP_COMPLETE': {
       // Nächste Welle; transfer-Kanal für den nächsten Kampf zurücksetzen.
       const nextWave = state.run.waveNumber + 1;
