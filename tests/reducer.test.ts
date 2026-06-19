@@ -78,6 +78,24 @@ describe('reducer — Run-Lebenszyklus & transfer-Vertrag', () => {
     expect(noop).toBe(afterBuy);
   });
 
+
+  it('SHOP_REFUND erstattet Währung und entfernt Upgrade', () => {
+    let s = createInitialState();
+    s = run(s, [
+      { type: 'START_RUN', levelId: 'world_1', totalWaves: 15, seed: 1, maxHp: 100 },
+      { type: 'COMBAT_BALLS_COLLECTED', amount: 50 },
+      { type: 'COMBAT_COMPLETE' },
+      { type: 'DROP_COMPLETE', balls: 100 },
+      { type: 'SHOP_BUY', upgradeId: 'upg_x', cost: 40 }
+    ]);
+    expect(s.run.currency).toBe(60);
+    expect(s.run.upgrades).toContain('upg_x');
+
+    const afterRefund = reducer(s, { type: 'SHOP_REFUND', upgradeId: 'upg_x', cost: 40 });
+    expect(afterRefund.run.currency).toBe(100);
+    expect(afterRefund.run.upgrades).not.toContain('upg_x');
+  });
+
   it('SHOP_COMPLETE erhöht die Welle und setzt den transfer-Kanal zurück', () => {
     let s = createInitialState();
     s = run(s, [

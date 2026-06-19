@@ -84,18 +84,22 @@ export class ShopOverlay {
       <div class="cc-card__name">${card.name}</div>
       <div class="cc-card__desc">${card.description}</div>
       <div class="cc-card__cost">${cost} 🏐</div>`;
-    el.addEventListener('click', () => this.tryBuy(index));
+    el.addEventListener('click', () => this.toggleBuy(index));
     const costEl = el.querySelector('.cc-card__cost') as HTMLElement;
     this.cardEls.push({ el, costEl, card, cost });
     return el;
   }
 
-  private tryBuy(index: number): void {
-    if (this.bought.has(index)) return;
+  private toggleBuy(index: number): void {
     const entry = this.cardEls[index];
-    if (selectCurrency(this.gsm.getState()) < entry.cost) return;
-    this.bought.add(index);
-    eventBus.emit(GameEvent.ShopBuy, { upgradeId: entry.card.id, cost: entry.cost });
+    if (this.bought.has(index)) {
+      this.bought.delete(index);
+      eventBus.emit(GameEvent.ShopRefund, { upgradeId: entry.card.id, cost: entry.cost });
+    } else {
+      if (selectCurrency(this.gsm.getState()) < entry.cost) return;
+      this.bought.add(index);
+      eventBus.emit(GameEvent.ShopBuy, { upgradeId: entry.card.id, cost: entry.cost });
+    }
     // StateChanged → refresh markiert die Karte als gekauft.
   }
 
@@ -108,7 +112,7 @@ export class ShopOverlay {
       const unaffordable = !isBought && currency < cost;
       el.classList.toggle('is-bought', isBought);
       el.classList.toggle('is-unaffordable', unaffordable);
-      el.disabled = isBought;
+      el.disabled = unaffordable;
       el.setAttribute('aria-label', `${card.name}, ${cost} Bälle${isBought ? ', gekauft' : ''}`);
     }
   }

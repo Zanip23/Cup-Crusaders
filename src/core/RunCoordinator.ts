@@ -58,6 +58,10 @@ export class RunCoordinator {
       this.gsm.dispatch({ type: 'SHOP_BUY', upgradeId, cost });
     });
 
+    eventBus.on(GameEvent.ShopRefund, ({ upgradeId, cost }) => {
+      this.gsm.dispatch({ type: 'SHOP_REFUND', upgradeId, cost });
+    });
+
     eventBus.on(GameEvent.ShopComplete, () => {
       const run = this.gsm.getState().run;
       const wasBoss = run.waveNumber >= run.totalWaves; // letzter (Boss-)Abschnitt
